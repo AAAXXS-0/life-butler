@@ -14,7 +14,8 @@
 |------|------|
 | 🗺️ **行程规划** | 图模型（K-Means + Dijkstra）POI 筛选、最短路径优化、备选路线 |
 | 🧠 **七维记忆** | cache → promote → demote → emergency 四层覆盖，长期学习用户偏好 |
-| 🎲 **异常模拟** | generator/detector 实时模拟路况、客流等异常，自动 replan |
+| 🎲 **事件模拟** | event_generator/detector 模拟天气/排队/路况变化，好事过滤、坏事自动 replan |
+| 📍 **本地生活** | 4 skill：weather-monitor / queue-monitor / traffic-monitor / nearby-search |
 
 ---
 
@@ -22,14 +23,18 @@
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Coordinator │────→│  Trip Agent  │←────│ Mock Detector│
-│  (用户入口)  │     │  (行程规划)   │     │  (异常检测)   │
+│  Coordinator │────→│  Trip Agent  │←────│ Event Detector│
+│  (用户入口)  │     │  (行程规划)   │     │  (坏事检测)   │
 └──────┬──────┘     └──────┬───────┘     └──────┬───────┘
        │                   │                     │
+       │   ┌───────────────┴───────────────┐     │
+       │   │ weather/queue/traffic monitor │     │
+       │   │       (本地生活 skills)        │     │
+       │   └───────────────┬───────────────┘     │
        ↓                   ↓                     ↓
 ┌──────────────┐   ┌──────────────┐     ┌──────────────┐
-│ Account Agent│   │Schedule Agent│     │ Mock Generator│
-│  (财务感知)   │   │  (日程管理)  │     │  (异常产生)   │
+│ Account Agent│   │Schedule Agent│     │ Event Generator│
+│  (财务感知)   │   │  (日程管理)  │     │  (事件产生)   │
 └──────────────┘   └──────────────┘     └──────────────┘
        │                   │                     │
        └───────────────────┴─────────────────────┘
@@ -37,7 +42,7 @@
                     ┌──────┴──────┐
                     │   MySQL 9   │
                     │life_butler_db│
-                    │  (9 张表)    │
+                    │  (10 张表)   │
                     └─────────────┘
 ```
 
@@ -59,7 +64,7 @@ docker compose up -d
 # 手动验证：
 docker exec butler-mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -h 127.0.0.1 \
   --default-character-set=utf8mb4 life_butler_db -e "SHOW TABLES;"
-# 预期输出：9 张表（nodes, edges, node_status, edge_status, events, cache_events, seven_dimensions, promote_log, emergency_events）
+# 预期输出：10 张表（nodes, edges, node_status, edge_status, events, weather, cache_events, seven_dimensions, promote_log, emergency_events）
 ```
 
 ### 3. 配置定时任务（Coordinator 初始化）
@@ -94,19 +99,20 @@ MYSQL_PORT=3308 MYSQL_PASSWORD=1 npm run profile
 
 ---
 
-## 🗄️ 数据库（9 张表）
+## 🗄️ 数据库（10 张表）
 
 | 来源 | 表名 | 说明 | 初始行 |
 |------|------|------|--------|
-| mockend | `nodes` | 图节点（景点/餐厅/酒店/交通枢纽） | 52 |
-| mockend | `edges` | 图边（步行/地铁/驾车） | 80 |
-| mockend | `node_status` | 节点动态状态（open/limited/closed/full） | 52 |
-| mockend | `edge_status` | 边动态状态（open/congested/closed） | 80 |
-| mockend | `events` | 异常事件记录 | 0 |
-| 七维 | `cache_events` | 未验证侧写（第一层） | 0 |
-| 七维 | `seven_dimensions` | 已验证画像（第二层） | 0 |
+| mockend | `nodes` | 图节点（景点/餐厅/酒店/交通枢纽，含 queue_count/is_indoor）| 52 |
+| mockend | `edges` | 图边（步行/地铁/驾车）| 80 |
+| mockend | `node_status` | 节点动态状态（open/limited/closed/full）| 52 |
+| mockend | `edge_status` | 边动态状态（open/congested/closed）| 80 |
+| mockend | `events` | 事件记录（12 类型 + is_good 好/坏标记）| 0 |
+| mockend | `weather` | 全市天气（sunny/rainy/sandstorm/typhoon）| 1 |
+| 七维 | `cache_events` | 未验证侧写（第一层）| 0 |
+| 七维 | `seven_dimensions` | 已验证画像（第二层）| 0 |
 | 七维 | `promote_log` | 晋升日志 | 0 |
-| 七维 | `emergency_events` | 紧急覆盖（临时最高优先级） | 0 |
+| 七维 | `emergency_events` | 紧急覆盖（临时最高优先级）| 0 |
 
 ---
 
@@ -114,9 +120,9 @@ MYSQL_PORT=3308 MYSQL_PASSWORD=1 npm run profile
 
 | 文件 | 功能 | CLI 用法 |
 |------|------|---------|
-| `mock_backend/index.js` | MySQL 查询模块（query_nodes / shortest_path / Dijkstra） | 被 import |
-| `mock_backend/scripts/anomaly_generator.js` | 随机 UPDATE node/edge 状态 + INSERT events | `node mock_backend/scripts/anomaly_generator.js` |
-| `mock_backend/scripts/anomaly_detector.js` | 扫 MySQL → diff last_known.json → 推 trip-agent | `node mock_backend/scripts/anomaly_detector.js` |
+| `mock_backend/index.js` | MySQL 查询模块（query_nodes / shortest_path / get_weather / Dijkstra）| 被 import |
+| `mock_backend/scripts/event_generator.js` | 12 事件：改 nodes/edges/weather 表 + INSERT events（is_good 标记）| `node mock_backend/scripts/event_generator.js` |
+| `mock_backend/scripts/event_detector.js` | 读 events 表 → 过滤 is_good=0 → 推 trip-agent | `node mock_backend/scripts/event_detector.js` |
 | `skills/trip-skill/phases/phase2_poi_filter.js` | POI 筛选（query_nodes + rating 排序 + 备选） | `node … phase2 北京 '{"poi_types":["历史遗迹"]}'` |
 | `skills/trip-skill/phases/phase3_spatial_optimizer.js` | K-Means 聚类 + Dijkstra 路径 + budget 处理 | `node … phase3 <phase2.json> 3 10 <budget>` |
 | `skills/memory-seven-dim-skill/scripts/promote_cache.js` | cache → dimension 晋升（14 天内 weight≥3） | `node … promote_cache.js` |
@@ -136,11 +142,12 @@ butler/
 ├── .env.example              # 环境变量模板
 ├── .gitignore
 ├── mock_backend/
-│   ├── index.js              # MySQL 查询模块（CommonJS）
-│   ├── seed.sql              # 5 张表 + 北京子图 mock 数据
+│   ├── index.js              # MySQL 查询模块（CommonJS, + get_weather）
+│   ├── seed.sql              # 6 张表 + 北京子图 mock 数据
+│   ├── package.json
 │   └── scripts/
-│       ├── anomaly_generator.js
-│       ├── anomaly_detector.js
+│       ├── event_generator.js     # 事件发生器（12 事件, 好/坏）
+│       ├── event_detector.js      # 坏事检测器（过滤 is_good=0）
 │       └── README.md
 ├── skills/
 │   ├── trip-skill/
@@ -160,7 +167,11 @@ butler/
 │   │       └── add_forgotten_item.js
 │   ├── butler-comm-skill/
 │   ├── memory-layers-skill/
-│   └── subagent-skill/
+│   ├── subagent-skill/
+│   ├── weather-monitor-skill/SKILL.md     # 天气活动抓取（本地生活）
+│   ├── queue-monitor-skill/SKILL.md       # 餐厅排队监控（本地生活）
+│   ├── traffic-monitor-skill/SKILL.md     # 交通检查（本地生活）
+│   └── nearby-search-skill/SKILL.md       # 附近搜索（本地生活）
 ├── agents/
 │   ├── trip-agent/AGENTS.md
 │   ├── account-agent/AGENTS.md
@@ -174,8 +185,11 @@ butler/
     ├── 04-记忆系统.md
     ├── 05-Mock-Backend.md
     ├── 06-Cron-定时任务.md
-    └── 07-主动服务.md
+    ├── 07-主动服务.md
+    └── 08-本地生活Skills.md
 ```
+
+> 设计稿：`docs/local-life-skills-design.md`
 
 ---
 

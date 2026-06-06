@@ -138,6 +138,7 @@ async function query_nodes(filter = {}) {
   const orderBy = ' ORDER BY CAST(JSON_EXTRACT(n.props, \'$.rating\') AS DECIMAL(3,1)) DESC';
   const sql = `
     SELECT n.id, n.type, n.name, n.lat, n.lng, n.props,
+           n.queue_count, n.is_indoor,
            ns.status AS status, ns.reason AS status_reason
     FROM nodes n
     LEFT JOIN node_status ns ON ns.node_id = n.id
@@ -154,6 +155,8 @@ async function query_nodes(filter = {}) {
       lat: typeof r.lat === 'string' ? parseFloat(r.lat) : r.lat,
       lng: typeof r.lng === 'string' ? parseFloat(r.lng) : r.lng,
       props: typeof r.props === 'string' ? JSON.parse(r.props) : r.props,
+      queue_count: r.queue_count || 0,
+      is_indoor: r.is_indoor || 0,
       status: r.status || 'open',
       status_reason: r.status_reason || null,
     }));
@@ -488,6 +491,22 @@ class MinPriorityQueue {
   }
 }
 
+/**
+ * 查询某城市当前天气
+ * @param {string} city
+ * @returns {Object|null} { city, status, temperature, updated_at }
+ */
+async function get_weather(city) {
+  if (!city) return null;
+  return withRetry(async (p) => {
+    const [rows] = await p.query(
+      'SELECT city, status, temperature, updated_at FROM weather WHERE city = ?',
+      [city]
+    );
+    return rows[0] || null;
+  });
+}
+
 // ============== 优雅关闭 ==============
 async function close() {
   if (pool) {
@@ -502,6 +521,7 @@ module.exports = {
   get_shortest_path,
   get_alternative_paths,
   get_active_events,
+  get_weather,
   close,
   // 暴露给单测
   _withRetry: withRetry,

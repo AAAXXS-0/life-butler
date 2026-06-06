@@ -1,7 +1,7 @@
-# 本地生活 Skills + Mockend 扩展（草稿 v0.1）
+# 本地生活 Skills + Mockend 扩展（草稿 v0.2）
 
 > 日期：2026-06-06
-> 状态：草稿，待老板拍板后落地
+> 状态：设计稿，老板拍板 → 开始落地
 > 适用范围：比赛项目本地生活相关 skill 缺口 + mockend 重构
 
 ---
@@ -14,77 +14,78 @@
 
 ## 二、4 个新 Skill（Coordinator 主管）
 
-所有 skill 触发逻辑：trip-skill 在检测到异常时调 `replan-skill` → 通知 Coordinator → Coordinator 派对应 skill → skill 处理完 → 写 inbox → cron run 唤醒 Coordinator → Coordinator 告知用户。
+### 统一逻辑（weather / queue / traffic 三选一）
+
+3 个 skill **逻辑一样**，为填比赛要求分开写。每个 skill 触发后走同一流程：
+
+```
+1. event_generator.js 产生事件
+2. event_detector.js 检测到坏事
+3. → 推 trip-agent 收信箱 + cron run 唤醒
+4. trip-agent 发现影响行程 → 调 replan-skill → 将备选行程 + 坏事发送给 coordinator
+5. coordinator 调对应 skill（weather/queue/traffic）→ 汇报用户 + 询问是否更换
+6. 用户回是 → coordinator 回调 trip 更改行程
+7. 用户回否 → coordinator 回调 trip 保持原行程
+```
+
+> 复用现有 `replan-skill`，3 个新 skill 不重复造轮子。
+
+**3 个 skill 的区别只在「触发条件」和「提示文案」**：
 
 ### 1. `weather-monitor-skill`（天气活动抓取）
 
-**触发**：
-- trip-skill replan 回调时附带 weather_change=true
-- 用户主动问"今天天气怎么样"/"明天能出门吗"
+**触发**：trip-agent 回调中 `weather_change=true`
 
-**数据**：
-- `mock_backend/weather.json`（新增，模拟气象局）
-- 用户当前 `trips.json` 中正在进行的行程
+**数据**：`mock_backend/weather` 表（全市单条记录）
 
 **动作**：
-- 读 `weather.json` 当前北京天气（晴/雨/沙尘暴/台风）
-- 比对 trip 涉及的室外 POI 数量
-- 若天气恶劣且有室外 POI → 建议调换为室内备选
-
-**输出**：调换建议 + 通知用户
+- 读 `weather` 表当前状态
+- 若 status ∈ {雨, 沙尘暴, 台风} 且 trip 有室外 POI → 标 `weather_affected: true`
+- 提示文案："天气变了（现为 <天气>），该行程有 X 个室外 POI，备选行程已生成"
 
 ---
 
 ### 2. `queue-monitor-skill`（餐厅排队监控）
 
-**触发**：
-- trip-skill replan 回调时附带 queue_increase=true（排队人数变多）
-- 用户主动问"那家店要排多久"
+**触发**：trip-agent 回调中 `queue_increase=true`
 
-**数据**：
-- `nodes.queue_count`（节点新增字段，动态变化）
-- 当前 trip 中涉及的餐厅
+**数据**：`nodes.queue_count`
 
 **动作**：
-- 若某餐厅 queue_count > 50（阈值）→ 建议切备选
-- 通知用户"X 餐厅当前排队 X 人，建议切 Y"
-
-**输出**：备选推荐 + 通知用户
+- 读相关餐厅的 queue_count
+- 若 > 50 → 标 `queue_heavy: true`
+- 提示文案："<餐厅名> 现在排队 <N> 人，备选已切到 <备选餐厅>"
 
 ---
 
 ### 3. `traffic-monitor-skill`（交通检查）
 
-**触发**：
-- trip-skill replan 回调时附带 traffic_congestion=true
-- 用户主动问"现在去机场堵不堵"
+**触发**：trip-agent 回调中 `traffic_congestion=true`
 
-**数据**：
-- `edge_status` 中 status='congested' 的边
-- 当前行程涉及的所有边
+**数据**：`edge_status.status = 'congested'` 的边
 
 **动作**：
-- 若主路线 ≥ 2 条边 congestion → 切备选路线
-- 通知用户"主路线 X 段拥堵，已切备选 Y 段"
-
-**输出**：备选路线 + 通知用户
+- 读 trip 主路线涉及的边
+- 若 ≥ 2 条边 congestion → 标 `traffic_heavy: true`
+- 提示文案："主路线 X 段拥堵，已切到备选 Y 段"
 
 ---
 
 ### 4. `nearby-search-skill`（附近搜索）
 
-**触发**：用户突然来"附近有啥吃的"/"这附近有啥好玩的"等
+**触发**：用户"附近有啥吃的"/"这附近有啥好玩的"
 
-**数据**（Coordinator 直接读，无需委托）：
-- 用户当前位置（询问用户或从最近 trip 推断）
-- `mock_backend.query_nodes({ type, city, near: lat/lng, radius_km })`
+**位置获取**：**不主动问** → 直接查 `trips.json` → 取用户当前所在城市的当前 POI 坐标作为搜索中心
+
+**数据**：
+- `trips.json` 当前行程当前位置
+- `mock_backend.query_nodes({ type, city, near, radius_km })`
 - `accounts.json`（消费习惯 / 预算）
 - `schedule.json`（是否影响后续日程）
-- `trips.json`（是否在出行中）
-- 七维画像（taste 维度 / effort_goal）
+- 七维画像（taste / effort_goal）
 
 **动作**：
-1. 询问/推断用户位置
+1. 从 trip.json 拿当前位置 lat/lng
 2. 按距离 + 评分 + 开放状态筛选 POI
 3. 结合预算/时间/画像做加权排序
 4. 推荐 top 3 给用户
@@ -105,6 +106,8 @@ ALTER TABLE nodes ADD COLUMN is_indoor TINYINT(1) NOT NULL DEFAULT 0;
 - `queue_count`：餐厅/景点当前排队人数（默认 0）
 - `is_indoor`：是否室内（天气恶劣时切换用）
 
+**更新 seed.sql**：餐厅 `is_indoor=1`，景点 `is_indoor=0`（故宫/天坛等户外大），酒店 `is_indoor=1`
+
 ### 3.2 新增 `weather` 表（全市级天气）
 
 ```sql
@@ -122,16 +125,20 @@ INSERT INTO weather VALUES ('北京', 'sunny', 22, NOW());
 
 ### 3.3 events 表事件类型扩展
 
-| 事件 | 当前 | 扩展后 |
-|------|------|--------|
-| 天气变化 | 1 | 1（晴/雨/沙尘暴/台风，4 选 1） |
-| 排队人数变化 | - | 8（增/减，独立事件） |
-| POI 关闭 | 2 | 2 |
-| 餐厅满座 | 4 | 4 |
-| 道路封闭 | 5 | 5 |
-| 交通拥堵 | 6 | 6 |
-| 地铁延误 | 7 | 7 |
-| no_op | - | 9 |
+| 事件 type | 含义 |
+|-----------|------|
+| 1 | 天气变晴 |
+| 2 | 天气变雨 |
+| 3 | 天气变沙尘暴 |
+| 4 | 天气变台风 |
+| 5 | 排队 +N |
+| 6 | 排队 -N |
+| 7 | POI 限流 |
+| 8 | 餐厅满座 |
+| 9 | 道路封闭 |
+| 10 | 交通拥堵 |
+| 11 | 地铁延误 |
+| 12 | no_op |
 
 ### 3.4 事件发生器重写（`anomaly_generator.js` → `event_generator.js`）
 
@@ -164,17 +171,19 @@ INSERT INTO weather VALUES ('北京', 'sunny', 22, NOW());
   4. no_op 跳过
 ```
 
-**好/坏判定规则**（人定，老板定的版本）：
+**好/坏判定规则**（老板定版）：
 
-| 事件 | 判定 | 说明 |
-|------|------|------|
+| 事件 | 判定 | detector 行为 |
+|------|------|-----------------|
 | 天气变晴 | **好** | 不报 |
 | 天气变雨/沙尘暴/台风 | **坏** | 报 + 调 weather-monitor |
 | 排队 +N | **坏** | 报 + 调 queue-monitor |
-| 排队 -N | **好** | **不报**（你说设减少是好事） |
+| 排队 -N | **好** | **不报** |
 | POI 限流/关闭 | 坏 | 报 |
 | 餐厅满座/关门 | 坏 | 报 |
 | 道路封闭/拥堵/地铁延误 | 坏 | 报 + 调 traffic-monitor |
+
+实现：event_detector.js 维护一张 `GOOD_EVENTS = new Set([1, 6])`，命中则丢弃。
 
 ---
 
@@ -202,35 +211,38 @@ INSERT INTO weather VALUES ('北京', 'sunny', 22, NOW());
 
 ---
 
-## 五、待定 / 风险
+## 五、待定 / 风险（老板拍板后）
 
-| 项 | 状态 |
-|----|------|
-| weather 数据怎么生成（generator 直接 UPDATE weather 表） | 待确认 |
-| queue_count 怎么动态（generator 选 node 加/减 N） | 待确认 |
-| 用户问"附近有啥"时位置怎么获取（问 / 从 trip 推断 / 默认） | 待确认 |
-| 4 个 skill 是否一次性都做（建议 v0.1 只做 weather + queue + nearby，traffic 复用现有 edge_status 不单独 skill） | 待确认 |
-| event_generator 改名是否影响现有 cron | 需要 init.sh 同步更新 |
-| 4 个 skill 的 SKILL.md 写完再加 cron | 是 |
-| mockend 节点加 queue_count + is_indoor 需要 seed.sql 同步 | 是 |
-| 比赛 deadline 是什么时候 | 需问 |
-
----
-
-## 六、落地顺序建议
-
-1. **mockend 数据扩展**（nodes + queue_count + is_indoor + weather 表 + seed.sql 更新）
-2. **event_generator.js + event_detector.js**（改名 + 扩展事件类型 + 好/坏过滤）
-3. **weather-monitor-skill**（最简单）
-4. **queue-monitor-skill**
-5. **nearby-search-skill**（无 mockend 依赖，最独立）
-6. **traffic-monitor-skill**（可选，replan-skill 已部分覆盖）
-7. **init.sh 同步更新**（job 名称 + message 内容）
-8. **README 同步更新**
+| 项 | 拍板后状态 |
+|----|----------|
+| 4 个 skill 一次性都做 | **否** — 3 skill 简化为同一逻辑，3 个 SKILL.md 文档拆开 |
+| event_generator 改名 | **是** — `event_generator.js` / `event_detector.js` |
+| 4 个 skill 加 cron | **不需要** — 3 个 skill 是 trip 回调被动的，不加 wake job；nearby 直接调不加 wake |
+| mockend 节点加 queue_count + is_indoor | **是** — seed.sql 同步 |
+| 比赛 deadline | **不管**，不赶 |
+| weather 数据怎么生成 | generator 直接 UPDATE `weather` 表（4 状态机） |
+| queue_count 怎么动态 | generator 选 node 加/减 N（-N 为好，+N 为坏） |
+| 位置获取（nearby） | **不主动问** — 从 trip.json 拿 |
 
 ---
 
-## 七、文件名 / 路径建议
+## 六、落地顺序
+
+1. **mockend schema**（nodes 加 queue_count + is_indoor + weather 表 + seed.sql 同步）
+2. **index.js** 支持新查询（queue_count、is_indoor、weather）
+3. **event_generator.js**（重写：12 种事件 + 好/坏标记 + UPDATE weather）
+4. **event_detector.js**（重写：按规则过滤好事，只推坏事）
+5. **3 个 skill SKILL.md**（weather/queue/traffic，结构相同）
+6. **nearby-search-skill SKILL.md**（trip.json 拿位置）
+7. **init.sh 同步**（旧 anomaly-* 删掉 / 新 event-* 加上）
+8. **ARCHITECTURE 05/06 + 09（新建）**（mockend 重构 + 4 skill）
+9. **README 同步**
+10. **测试**（用 MySQL + 9 个脚本 + 4 skill 跑一遍）
+11. **commit**（init git → add → commit）
+
+---
+
+## 七、文件名 / 路径
 
 | 文件 | 路径 |
 |------|------|
@@ -238,10 +250,26 @@ INSERT INTO weather VALUES ('北京', 'sunny', 22, NOW());
 | `queue-monitor-skill/SKILL.md` | `skills/queue-monitor-skill/SKILL.md` |
 | `traffic-monitor-skill/SKILL.md` | `skills/traffic-monitor-skill/SKILL.md` |
 | `nearby-search-skill/SKILL.md` | `skills/nearby-search-skill/SKILL.md` |
-| `event_generator.js` | `mock_backend/scripts/event_generator.js`（替 anomaly_generator.js） |
-| `event_detector.js` | `mock_backend/scripts/event_detector.js`（替 anomaly_detector.js） |
-| `weather.json` 等于 `weather` 表 | 不需要单独文件 |
+| `event_generator.js` | `mock_backend/scripts/event_generator.js` |
+| `event_detector.js` | `mock_backend/scripts/event_detector.js` |
+| `weather` 表 | MySQL life_butler_db.weather |
 
 ---
 
-老板拍板哪个先做 / 哪个砍掉 / 哪个名字改 / 概率分布改，我再细写。
+## 八、好/坏判定规则（老板定版）
+
+| 事件 | 判定 | detector 行为 |
+|------|------|-----------------|
+| 天气变晴 | **好** | 不报 |
+| 天气变雨/沙尘暴/台风 | **坏** | 报 + 调 weather-monitor |
+| 排队 +N | **坏** | 报 + 调 queue-monitor |
+| 排队 -N | **好** | **不报** |
+| POI 限流/关闭 | 坏 | 报 |
+| 餐厅满座/关门 | 坏 | 报 |
+| 道路封闭/拥堵/地铁延误 | 坏 | 报 + 调 traffic-monitor |
+
+实现：event_detector.js 维护一张 `GOOD_EVENTS = new Set([1, 6])`，命中则丢弃。
+
+---
+
+老板拍板顺序：先做 mockend 改造，再做 skill 文档，最后 init.sh + ARCHITECTURE + README 同步，最后 commit。

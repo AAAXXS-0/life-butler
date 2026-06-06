@@ -185,13 +185,15 @@ get_active_events(trip_nodes)
 
 ---
 
-## 9. 两个 mockend 定时脚本
+## 9. 两个 mockend 定时脚本（v2: 事件发生器 + 坏事检测器）
 
-**核心设计原则**：两个脚本**直接操作 MySQL**，不经中间文件。对比本只有 `last_known.json`（detector diff 用）。检测到差异后，**只**写 trip-agent 收信箱 + `openclaw cron run` 唤醒它。trip-agent 决定是否影响行程。
+**v2 改动**（2026-06-06）：从「异常模拟」重构为「事件模拟」。generator 产生好事件和坏事件，detector 只推坏事。详见 [08-本地生活Skills.md](08-本地生活Skills.md) §五。
 
-> **无 graph.json**：generator 直接 UPDATE MySQL，detector 直接 SELECT MySQL。
+**核心设计原则**：两个脚本**直接操作 MySQL**，不经中间文件。状态记录在 `last_event_id.json`（detector 记录上次处理到的 events.id 位置）。坏事件推 trip-agent 收信箱 + `openclaw cron run` 唤醒。trip-agent 决定是否影响行程。
 
-### 9.1 anomaly_generator.js（异常发生器）
+> **无 graph.json**：generator 直接 UPDATE MySQL，detector 直接 SELECT events 表。
+
+### 9.1 event_generator.js（事件发生器）
 
 **频率**：每 30m（可调，范围 10-60m）
 
@@ -205,9 +207,9 @@ get_active_events(trip_nodes)
 5. INSERT INTO `events`（记录事件）
 6. 不发任何通知（detector 负责发现）
 
-**文件**：`mock_backend/scripts/anomaly_generator.js`（**已有 .py 旧版需重写**）
+**文件**：`mock_backend/scripts/event_generator.js`（已重写：12 事件 + 好/坏标记 + UPDATE weather）
 
-### 9.2 anomaly_detector.js（异常检测器）
+### 9.2 event_detector.js（坏事检测器）
 
 **频率**：每 10m（可调，范围 10-20m，比发生器高）
 
@@ -244,7 +246,7 @@ get_active_events(trip_nodes)
 
 **对比本**：`last_known.json` 格式：`{ nodes: { <node_id>: { status, reason } }, edges: { <edge_id>: { status, reason } } }`。
 
-**文件**：`mock_backend/scripts/anomaly_detector.js`（**已有 .py 旧版需重写**）
+**文件**：`mock_backend/scripts/event_detector.js`（已重写：读 events + 过滤 is_good=0 + 推 inbox）
 
 ### 9.3 trip-agent 收到后做什么
 
@@ -269,10 +271,10 @@ get_active_events(trip_nodes)
 
 ```cron
 # mockend 异常发生器（每 30 分钟）
-*/30 * * * * cd /home/zero/.openclaw/workspace-butler && node mock_backend/scripts/anomaly_generator.js >> /var/log/butler-mockgen.log 2>&1
+*/30 * * * * cd $WORKSPACE && node mock_backend/scripts/event_generator.js >> /var/log/butler-eventgen.log 2>&1
 
-# mockend 异常检测器（每 10 分钟）
-*/10 * * * * cd /home/zero/.openclaw/workspace-butler && node mock_backend/scripts/anomaly_detector.js >> /var/log/butler-mockdet.log 2>&1
+# mockend 坏事件检测器（每 10 分钟）
+*/10 * * * * cd $WORKSPACE && node mock_backend/scripts/event_detector.js >> /var/log/butler-eventdet.log 2>&1
 ```
 
 **频率可调**：在 crontab 里改 `*/30` 和 `*/10` 即可。
@@ -288,4 +290,4 @@ get_active_events(trip_nodes)
 | `/var/log/butler-mockgen.log` | generator 日志 |
 | `/var/log/butler-mockdet.log` | detector 日志 |
 
-**没有 `graph.json`、没有 `export_graph.py`**：两个脚本直接 MySQL，不经过中间文件。
+**没有 `graph.json`、没有 `export_graph.py`**：两个脚本直接 MySQL，不经过中间文件。v2 进一步：generator 把好/坏标记直接写入 events.is_good，detector 按此过滤。

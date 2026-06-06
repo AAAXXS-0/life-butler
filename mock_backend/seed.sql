@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   lat        DOUBLE NOT NULL,
   lng        DOUBLE NOT NULL,
   props      JSON,
+  queue_count INT NOT NULL DEFAULT 0,           -- 餐厅/景点当前排队人数
+  is_indoor  TINYINT(1) NOT NULL DEFAULT 0,     -- 是否室内（天气恶劣时切换用）
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -71,10 +73,11 @@ CREATE TABLE IF NOT EXISTS edge_status (
 -- =============================================
 CREATE TABLE IF NOT EXISTS events (
   id           VARCHAR(32) PRIMARY KEY,
-  type         TINYINT NOT NULL,
-  target_type  ENUM('node','edge') NOT NULL,
+  type         TINYINT NOT NULL,    -- 1=天气转晴 2=天气转雨 3=天气转沙尘暴 4=天气转台风 5=排队+ 6=排队- 7=POI限流 8=餐厅满座 9=道路封闭 10=交通拥堵 11=地铁延误 12=no_op
+  target_type  ENUM('node','edge','city') NOT NULL,
   target_id    VARCHAR(32) NOT NULL,
   severity     ENUM('low','medium','high') NOT NULL,
+  is_good      TINYINT(1) NOT NULL DEFAULT 0,  -- 标记好事（detector 过滤用）
   title        VARCHAR(256),
   detail       TEXT,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -83,73 +86,85 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX idx_events_created ON events(created_at);
 
 -- =============================================
+-- 表6：weather（全市级天气）
+-- =============================================
+CREATE TABLE IF NOT EXISTS weather (
+  city        VARCHAR(32) PRIMARY KEY,
+  status      ENUM('sunny','rainy','sandstorm','typhoon') NOT NULL,
+  temperature INT,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO weather (city, status, temperature) VALUES
+('北京', 'sunny', 22)
+ON DUPLICATE KEY UPDATE status = 'sunny', temperature = 22, updated_at = NOW();
 -- 北京子图 Mock 数据
 -- 范围：东城/西城/朝阳/海淀 核心区
 -- =============================================
 
 -- 景点（25 个）
-INSERT INTO nodes (id, type, name, lat, lng, props) VALUES
-('attr_001','attraction','故宫',39.9163,116.3972, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('博物馆','世界遗产','必去'),'rating',4.8,'duration_estimate',180,'ticket_price',60,'nearest_metro','天安门东')),
-('attr_002','attraction','天坛',39.8827,116.4128, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('世界遗产','公园'),'rating',4.6,'duration_estimate',150,'ticket_price',35,'nearest_metro','天坛东门')),
-('attr_003','attraction','颐和园',39.9998,116.2755, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('园林','世界遗产'),'rating',4.7,'duration_estimate',240,'ticket_price',30,'nearest_metro','北宫门')),
-('attr_004','attraction','圆明园',40.0083,116.2988, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('遗址','园林'),'rating',4.5,'duration_estimate',180,'ticket_price',10,'nearest_metro','圆明园')),
-('attr_005','attraction','北海公园',39.9249,116.3876, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('皇家园林','白塔'),'rating',4.5,'duration_estimate',120,'ticket_price',10,'nearest_metro','北海北')),
-('attr_006','attraction','景山公园',39.9254,116.3969, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('俯瞰故宫'),'rating',4.4,'duration_estimate',60,'ticket_price',2,'nearest_metro','景山东街')),
-('attr_007','attraction','国家博物馆',39.9054,116.3949, JSON_OBJECT('city','北京','category','博物馆','tags',JSON_ARRAY('室内','文物'),'rating',4.9,'duration_estimate',180,'ticket_price',0,'nearest_metro','天安门东')),
-('attr_008','attraction','首都博物馆',39.9089,116.3380, JSON_OBJECT('city','北京','category','博物馆','tags',JSON_ARRAY('室内','历史'),'rating',4.6,'duration_estimate',150,'ticket_price',0,'nearest_metro','白云路')),
-('attr_009','attraction','798艺术区',39.9839,116.4969, JSON_OBJECT('city','北京','category','艺术区','tags',JSON_ARRAY('艺术','拍照','网红'),'rating',4.5,'duration_estimate',180,'ticket_price',0,'nearest_metro','望京南')),
-('attr_010','attraction','南锣鼓巷',39.9377,116.4036, JSON_OBJECT('city','北京','category','胡同','tags',JSON_ARRAY('小吃','文艺','人多'),'rating',4.3,'duration_estimate',120,'ticket_price',0,'nearest_metro','南锣鼓巷')),
-('attr_011','attraction','什刹海',39.9408,116.3875, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('酒吧','夜景','滑冰'),'rating',4.5,'duration_estimate',120,'ticket_price',0,'nearest_metro','什刹海')),
-('attr_012','attraction','雍和宫',39.9471,116.4167, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('寺庙','藏传佛教'),'rating',4.6,'duration_estimate',90,'ticket_price',25,'nearest_metro','雍和宫')),
-('attr_013','attraction','国子监',39.9437,116.4136, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('孔庙','古代学府'),'rating',4.4,'duration_estimate',60,'ticket_price',30,'nearest_metro','雍和宫')),
-('attr_014','attraction','王府井',39.9135,116.4106, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('购物','小吃'),'rating',4.2,'duration_estimate',120,'ticket_price',0,'nearest_metro','王府井')),
-('attr_015','attraction','三里屯',39.9362,116.4547, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('酒吧','购物','时尚'),'rating',4.4,'duration_estimate',180,'ticket_price',0,'nearest_metro','团结湖')),
-('attr_016','attraction','后海',39.9413,116.3815, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('夜景','酒吧'),'rating',4.5,'duration_estimate',120,'ticket_price',0,'nearest_metro','鼓楼大街')),
-('attr_017','attraction','朝阳公园',39.9387,116.4760, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('大','游乐场'),'rating',4.4,'duration_estimate',180,'ticket_price',5,'nearest_metro','枣营')),
-('attr_018','attraction','奥林匹克公园',40.0026,116.3905, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('鸟巢','水立方','奥运'),'rating',4.6,'duration_estimate',180,'ticket_price',0,'nearest_metro','奥林匹克公园')),
-('attr_019','attraction','香山公园',39.9993,116.1880, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('红叶','爬山'),'rating',4.5,'duration_estimate',240,'ticket_price',10,'nearest_metro','香山')),
-('attr_020','attraction','八达岭长城',40.3598,116.0240, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('世界遗产','必去','远'),'rating',4.7,'duration_estimate',360,'ticket_price',40,'nearest_metro',NULL)),
-('attr_021','attraction','明十三陵',40.2995,116.2353, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('陵墓','世界遗产'),'rating',4.4,'duration_estimate',240,'ticket_price',45,'nearest_metro',NULL)),
-('attr_022','attraction','恭王府',39.9358,116.3850, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('王府','和珅'),'rating',4.5,'duration_estimate',120,'ticket_price',40,'nearest_metro','北海北')),
-('attr_023','attraction','天安门广场',39.9054,116.3976, JSON_OBJECT('city','北京','category','广场','tags',JSON_ARRAY('升旗','必去'),'rating',4.7,'duration_estimate',60,'ticket_price',0,'nearest_metro','天安门东')),
-('attr_024','attraction','毛主席纪念堂',39.9050,116.3970, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('纪念堂'),'rating',4.5,'duration_estimate',30,'ticket_price',0,'nearest_metro','天安门东')),
-('attr_025','attraction','大栅栏',39.8974,116.3935, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('老字号','小吃'),'rating',4.2,'duration_estimate',90,'ticket_price',0,'nearest_metro','大栅栏'));
+INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALUES
+('attr_001','attraction','故宫',39.9163,116.3972, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('博物馆','世界遗产','必去'),'rating',4.8,'duration_estimate',180,'ticket_price',60,'nearest_metro','天安门东'), 0, 0),
+('attr_002','attraction','天坛',39.8827,116.4128, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('世界遗产','公园'),'rating',4.6,'duration_estimate',150,'ticket_price',35,'nearest_metro','天坛东门'), 0, 0),
+('attr_003','attraction','颐和园',39.9998,116.2755, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('园林','世界遗产'),'rating',4.7,'duration_estimate',240,'ticket_price',30,'nearest_metro','北宫门'), 0, 0),
+('attr_004','attraction','圆明园',40.0083,116.2988, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('遗址','园林'),'rating',4.5,'duration_estimate',180,'ticket_price',10,'nearest_metro','圆明园'), 0, 0),
+('attr_005','attraction','北海公园',39.9249,116.3876, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('皇家园林','白塔'),'rating',4.5,'duration_estimate',120,'ticket_price',10,'nearest_metro','北海北'), 0, 0),
+('attr_006','attraction','景山公园',39.9254,116.3969, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('俯瞰故宫'),'rating',4.4,'duration_estimate',60,'ticket_price',2,'nearest_metro','景山东街'), 0, 0),
+('attr_007','attraction','国家博物馆',39.9054,116.3949, JSON_OBJECT('city','北京','category','博物馆','tags',JSON_ARRAY('室内','文物'),'rating',4.9,'duration_estimate',180,'ticket_price',0,'nearest_metro','天安门东'), 0, 0),
+('attr_008','attraction','首都博物馆',39.9089,116.3380, JSON_OBJECT('city','北京','category','博物馆','tags',JSON_ARRAY('室内','历史'),'rating',4.6,'duration_estimate',150,'ticket_price',0,'nearest_metro','白云路'), 0, 0),
+('attr_009','attraction','798艺术区',39.9839,116.4969, JSON_OBJECT('city','北京','category','艺术区','tags',JSON_ARRAY('艺术','拍照','网红'),'rating',4.5,'duration_estimate',180,'ticket_price',0,'nearest_metro','望京南'), 0, 0),
+('attr_010','attraction','南锣鼓巷',39.9377,116.4036, JSON_OBJECT('city','北京','category','胡同','tags',JSON_ARRAY('小吃','文艺','人多'),'rating',4.3,'duration_estimate',120,'ticket_price',0,'nearest_metro','南锣鼓巷'), 0, 0),
+('attr_011','attraction','什刹海',39.9408,116.3875, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('酒吧','夜景','滑冰'),'rating',4.5,'duration_estimate',120,'ticket_price',0,'nearest_metro','什刹海'), 0, 0),
+('attr_012','attraction','雍和宫',39.9471,116.4167, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('寺庙','藏传佛教'),'rating',4.6,'duration_estimate',90,'ticket_price',25,'nearest_metro','雍和宫'), 0, 0),
+('attr_013','attraction','国子监',39.9437,116.4136, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('孔庙','古代学府'),'rating',4.4,'duration_estimate',60,'ticket_price',30,'nearest_metro','雍和宫'), 0, 0),
+('attr_014','attraction','王府井',39.9135,116.4106, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('购物','小吃'),'rating',4.2,'duration_estimate',120,'ticket_price',0,'nearest_metro','王府井'), 0, 0),
+('attr_015','attraction','三里屯',39.9362,116.4547, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('酒吧','购物','时尚'),'rating',4.4,'duration_estimate',180,'ticket_price',0,'nearest_metro','团结湖'), 0, 0),
+('attr_016','attraction','后海',39.9413,116.3815, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('夜景','酒吧'),'rating',4.5,'duration_estimate',120,'ticket_price',0,'nearest_metro','鼓楼大街'), 0, 0),
+('attr_017','attraction','朝阳公园',39.9387,116.4760, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('大','游乐场'),'rating',4.4,'duration_estimate',180,'ticket_price',5,'nearest_metro','枣营'), 0, 0),
+('attr_018','attraction','奥林匹克公园',40.0026,116.3905, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('鸟巢','水立方','奥运'),'rating',4.6,'duration_estimate',180,'ticket_price',0,'nearest_metro','奥林匹克公园'), 0, 0),
+('attr_019','attraction','香山公园',39.9993,116.1880, JSON_OBJECT('city','北京','category','公园','tags',JSON_ARRAY('红叶','爬山'),'rating',4.5,'duration_estimate',240,'ticket_price',10,'nearest_metro','香山'), 0, 0),
+('attr_020','attraction','八达岭长城',40.3598,116.0240, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('世界遗产','必去','远'),'rating',4.7,'duration_estimate',360,'ticket_price',40,'nearest_metro',NULL), 0, 0),
+('attr_021','attraction','明十三陵',40.2995,116.2353, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('陵墓','世界遗产'),'rating',4.4,'duration_estimate',240,'ticket_price',45,'nearest_metro',NULL), 0, 0),
+('attr_022','attraction','恭王府',39.9358,116.3850, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('王府','和珅'),'rating',4.5,'duration_estimate',120,'ticket_price',40,'nearest_metro','北海北'), 0, 0),
+('attr_023','attraction','天安门广场',39.9054,116.3976, JSON_OBJECT('city','北京','category','广场','tags',JSON_ARRAY('升旗','必去'),'rating',4.7,'duration_estimate',60,'ticket_price',0,'nearest_metro','天安门东'), 0, 0),
+('attr_024','attraction','毛主席纪念堂',39.9050,116.3970, JSON_OBJECT('city','北京','category','历史遗迹','tags',JSON_ARRAY('纪念堂'),'rating',4.5,'duration_estimate',30,'ticket_price',0,'nearest_metro','天安门东'), 0, 0),
+('attr_025','attraction','大栅栏',39.8974,116.3935, JSON_OBJECT('city','北京','category','商业街','tags',JSON_ARRAY('老字号','小吃'),'rating',4.2,'duration_estimate',90,'ticket_price',0,'nearest_metro','大栅栏'), 0, 0);
 
 -- 餐厅（15 个）
-INSERT INTO nodes (id, type, name, lat, lng, props) VALUES
-('rest_001','restaurant','全聚德',39.9142,116.4119, JSON_OBJECT('city','北京','category','北京菜','人均',200,'hours','10:00-22:00','rating',4.7,'tags',JSON_ARRAY('烤鸭','老字号'))),
-('rest_002','restaurant','东来顺',39.9218,116.4182, JSON_OBJECT('city','北京','category','涮羊肉','人均',180,'hours','11:00-22:00','rating',4.6,'tags',JSON_ARRAY('火锅','老字号'))),
-('rest_003','restaurant','便宜坊',39.9153,116.4083, JSON_OBJECT('city','北京','category','北京菜','人均',220,'hours','10:00-21:30','rating',4.6,'tags',JSON_ARRAY('烤鸭','焖炉'))),
-('rest_004','restaurant','海底捞',39.9123,116.4125, JSON_OBJECT('city','北京','category','火锅','人均',150,'hours','10:00-02:00','rating',4.7,'tags',JSON_ARRAY('服务好','排队'))),
-('rest_005','restaurant','簋街小龙虾',39.9385,116.4195, JSON_OBJECT('city','北京','category','川菜','人均',180,'hours','17:00-03:00','rating',4.5,'tags',JSON_ARRAY('小龙虾','夜宵'))),
-('rest_006','restaurant','西单大悦城',39.9093,116.3735, JSON_OBJECT('city','北京','category','综合','人均',100,'hours','10:00-22:00','rating',4.3,'tags',JSON_ARRAY('购物中心','多选择'))),
-('rest_007','restaurant','护国寺小吃',39.9359,116.3869, JSON_OBJECT('city','北京','category','小吃','人均',40,'hours','06:00-21:00','rating',4.4,'tags',JSON_ARRAY('豆汁','传统'))),
-('rest_008','restaurant','姚记炒肝',39.9395,116.4073, JSON_OBJECT('city','北京','category','小吃','人均',50,'hours','06:00-20:30','rating',4.3,'tags',JSON_ARRAY('炒肝','老北京'))),
-('rest_009','restaurant','九门小吃',39.9388,116.3992, JSON_OBJECT('city','北京','category','小吃','人均',60,'hours','10:00-22:00','rating',4.4,'tags',JSON_ARRAY('老北京','汇聚'))),
-('rest_010','restaurant','四季民福',39.9118,116.3935, JSON_OBJECT('city','北京','category','北京菜','人均',250,'hours','11:00-22:00','rating',4.8,'tags',JSON_ARRAY('烤鸭','景观'))),
-('rest_011','restaurant','大董烤鸭',39.9188,116.4508, JSON_OBJECT('city','北京','category','北京菜','人均',300,'hours','11:00-22:00','rating',4.8,'tags',JSON_ARRAY('烤鸭','高端'))),
-('rest_012','restaurant','庆丰包子铺',39.9162,116.4042, JSON_OBJECT('city','北京','category','小吃','人均',30,'hours','06:00-21:00','rating',4.0,'tags',JSON_ARRAY('包子','平价'))),
-('rest_013','restaurant','外婆家',39.9241,116.4358, JSON_OBJECT('city','北京','category','江浙菜','人均',80,'hours','10:30-21:30','rating',4.5,'tags',JSON_ARRAY('杭帮菜','排队'))),
-('rest_014','restaurant','南京大牌档',39.9282,116.4351, JSON_OBJECT('city','北京','category','江浙菜','人均',90,'hours','10:00-22:00','rating',4.6,'tags',JSON_ARRAY('民国风','多菜'))),
-('rest_015','restaurant','局气',39.9287,116.4358, JSON_OBJECT('city','北京','category','北京菜','人均',120,'hours','11:00-22:00','rating',4.5,'tags',JSON_ARRAY('创意','京味')));
+INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALUES
+('rest_001','restaurant','全聚德',39.9142,116.4119, JSON_OBJECT('city','北京','category','北京菜','人均',200,'hours','10:00-22:00','rating',4.7,'tags',JSON_ARRAY('烤鸭','老字号')), 0, 1),
+('rest_002','restaurant','东来顺',39.9218,116.4182, JSON_OBJECT('city','北京','category','涮羊肉','人均',180,'hours','11:00-22:00','rating',4.6,'tags',JSON_ARRAY('火锅','老字号')), 0, 1),
+('rest_003','restaurant','便宜坊',39.9153,116.4083, JSON_OBJECT('city','北京','category','北京菜','人均',220,'hours','10:00-21:30','rating',4.6,'tags',JSON_ARRAY('烤鸭','焖炉')), 0, 1),
+('rest_004','restaurant','海底捞',39.9123,116.4125, JSON_OBJECT('city','北京','category','火锅','人均',150,'hours','10:00-02:00','rating',4.7,'tags',JSON_ARRAY('服务好','排队')), 0, 1),
+('rest_005','restaurant','簋街小龙虾',39.9385,116.4195, JSON_OBJECT('city','北京','category','川菜','人均',180,'hours','17:00-03:00','rating',4.5,'tags',JSON_ARRAY('小龙虾','夜宵')), 0, 1),
+('rest_006','restaurant','西单大悦城',39.9093,116.3735, JSON_OBJECT('city','北京','category','综合','人均',100,'hours','10:00-22:00','rating',4.3,'tags',JSON_ARRAY('购物中心','多选择')), 0, 1),
+('rest_007','restaurant','护国寺小吃',39.9359,116.3869, JSON_OBJECT('city','北京','category','小吃','人均',40,'hours','06:00-21:00','rating',4.4,'tags',JSON_ARRAY('豆汁','传统')), 0, 1),
+('rest_008','restaurant','姚记炒肝',39.9395,116.4073, JSON_OBJECT('city','北京','category','小吃','人均',50,'hours','06:00-20:30','rating',4.3,'tags',JSON_ARRAY('炒肝','老北京')), 0, 1),
+('rest_009','restaurant','九门小吃',39.9388,116.3992, JSON_OBJECT('city','北京','category','小吃','人均',60,'hours','10:00-22:00','rating',4.4,'tags',JSON_ARRAY('老北京','汇聚')), 0, 1),
+('rest_010','restaurant','四季民福',39.9118,116.3935, JSON_OBJECT('city','北京','category','北京菜','人均',250,'hours','11:00-22:00','rating',4.8,'tags',JSON_ARRAY('烤鸭','景观')), 0, 1),
+('rest_011','restaurant','大董烤鸭',39.9188,116.4508, JSON_OBJECT('city','北京','category','北京菜','人均',300,'hours','11:00-22:00','rating',4.8,'tags',JSON_ARRAY('烤鸭','高端')), 0, 1),
+('rest_012','restaurant','庆丰包子铺',39.9162,116.4042, JSON_OBJECT('city','北京','category','小吃','人均',30,'hours','06:00-21:00','rating',4.0,'tags',JSON_ARRAY('包子','平价')), 0, 1),
+('rest_013','restaurant','外婆家',39.9241,116.4358, JSON_OBJECT('city','北京','category','江浙菜','人均',80,'hours','10:30-21:30','rating',4.5,'tags',JSON_ARRAY('杭帮菜','排队')), 0, 1),
+('rest_014','restaurant','南京大牌档',39.9282,116.4351, JSON_OBJECT('city','北京','category','江浙菜','人均',90,'hours','10:00-22:00','rating',4.6,'tags',JSON_ARRAY('民国风','多菜')), 0, 1),
+('rest_015','restaurant','局气',39.9287,116.4358, JSON_OBJECT('city','北京','category','北京菜','人均',120,'hours','11:00-22:00','rating',4.5,'tags',JSON_ARRAY('创意','京味')), 0, 1);
 
 -- 酒店（8 个）
-INSERT INTO nodes (id, type, name, lat, lng, props) VALUES
-('hotel_001','hotel','王府半岛酒店',39.9154,116.4103, JSON_OBJECT('city','北京','district','王府井','price',1500,'stars',5,'rating',4.8)),
-('hotel_002','hotel','北京饭店',39.9130,116.4105, JSON_OBJECT('city','北京','district','王府井','price',1200,'stars',5,'rating',4.7)),
-('hotel_003','hotel','东方君悦',39.9120,116.4110, JSON_OBJECT('city','北京','district','王府井','price',1800,'stars',5,'rating',4.9)),
-('hotel_004','hotel','如家精选',39.9395,116.4070, JSON_OBJECT('city','北京','district','南锣鼓巷','price',400,'stars',3,'rating',4.3)),
-('hotel_005','hotel','汉庭',39.9218,116.4358, JSON_OBJECT('city','北京','district','三里屯','price',350,'stars',2,'rating',4.1)),
-('hotel_006','hotel','亚朵',39.9412,116.4536, JSON_OBJECT('city','北京','district','三里屯','price',600,'stars',3,'rating',4.6)),
-('hotel_007','hotel','希尔顿',39.9111,116.4112, JSON_OBJECT('city','北京','district','王府井','price',2000,'stars',5,'rating',4.7)),
-('hotel_008','hotel','全季',39.9404,116.4073, JSON_OBJECT('city','北京','district','南锣鼓巷','price',500,'stars',3,'rating',4.5));
+INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALUES
+('hotel_001','hotel','王府半岛酒店',39.9154,116.4103, JSON_OBJECT('city','北京','district','王府井','price',1500,'stars',5,'rating',4.8), 0, 1),
+('hotel_002','hotel','北京饭店',39.9130,116.4105, JSON_OBJECT('city','北京','district','王府井','price',1200,'stars',5,'rating',4.7), 0, 1),
+('hotel_003','hotel','东方君悦',39.9120,116.4110, JSON_OBJECT('city','北京','district','王府井','price',1800,'stars',5,'rating',4.9), 0, 1),
+('hotel_004','hotel','如家精选',39.9395,116.4070, JSON_OBJECT('city','北京','district','南锣鼓巷','price',400,'stars',3,'rating',4.3), 0, 1),
+('hotel_005','hotel','汉庭',39.9218,116.4358, JSON_OBJECT('city','北京','district','三里屯','price',350,'stars',2,'rating',4.1), 0, 1),
+('hotel_006','hotel','亚朵',39.9412,116.4536, JSON_OBJECT('city','北京','district','三里屯','price',600,'stars',3,'rating',4.6), 0, 1),
+('hotel_007','hotel','希尔顿',39.9111,116.4112, JSON_OBJECT('city','北京','district','王府井','price',2000,'stars',5,'rating',4.7), 0, 1),
+('hotel_008','hotel','全季',39.9404,116.4073, JSON_OBJECT('city','北京','district','南锣鼓巷','price',500,'stars',3,'rating',4.5), 0, 1);
 
 -- 交通枢纽（4 个）
-INSERT INTO nodes (id, type, name, lat, lng, props) VALUES
-('hub_001','transport_hub','北京南站',39.8652,116.3783, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁4号线'))),
-('hub_002','transport_hub','北京西站',39.8949,116.3219, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁7号线','地铁9号线'))),
-('hub_003','transport_hub','北京站',39.9023,116.4270, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁2号线'))),
-('hub_004','transport_hub','首都机场',40.0801,116.5846, JSON_OBJECT('city','北京','lines',JSON_ARRAY('机场快线','飞机')));
+INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALUES
+('hub_001','transport_hub','北京南站',39.8652,116.3783, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁4号线')), 0, 1),
+('hub_002','transport_hub','北京西站',39.8949,116.3219, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁7号线','地铁9号线')), 0, 1),
+('hub_003','transport_hub','北京站',39.9023,116.4270, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁2号线')), 0, 1),
+('hub_004','transport_hub','首都机场',40.0801,116.5846, JSON_OBJECT('city','北京','lines',JSON_ARRAY('机场快线','飞机')), 0, 1);
 
 -- 节点初始状态（全部 open）
 INSERT INTO node_status (node_id, status) VALUES

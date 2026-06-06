@@ -23,13 +23,13 @@ if ! command -v openclaw &>/dev/null; then
 else
   echo "--- 注册 OpenClaw cron jobs ---"
 
-  # --- trip-agent wake（coordinator 委托 / mockend 异常 唤醒） ---
+  # --- trip-agent wake（coordinator 委托 / mockend 事件 唤醒） ---
   openclaw cron add \
     --name "butler-trip-agent-wake" \
     --agent butler-trip-agent \
     --at "2036-01-01T00:00:00+08:00" \
     --session-key "session:butler-trip-agent:inbox" \
-    --message "读 shared/trip-agent/ 中最近2天的 .json 文件。处理 coordinator 委托或 mockend 异常 diff。写回复到对应收件箱。" \
+    --message "读 shared/trip-agent/ 中最近2天的 .json 文件。处理 coordinator 委托或 mockend 事件 detector 推送的坏事件。写回复到对应收件箱。" \
     --disabled \
     --no-deliver \
     --wake now 2>/dev/null || echo "  trip-agent-wake: already exists (skip)"
@@ -99,30 +99,46 @@ fi
 echo ""
 echo "--- 配置系统 crontab ---"
 
-CRON_GEN="*/30 * * * * cd $WORKSPACE && node $SCRIPTS/anomaly_generator.js >> /var/log/butler-mockgen.log 2>&1"
-CRON_DET="*/10 * * * * cd $WORKSPACE && node $SCRIPTS/anomaly_detector.js >> /var/log/butler-mockdet.log 2>&1"
+CRON_GEN="*/30 * * * * cd $WORKSPACE && node $SCRIPTS/event_generator.js >> /var/log/butler-eventgen.log 2>&1"
+CRON_DET="*/10 * * * * cd $WORKSPACE && node $SCRIPTS/event_detector.js >> /var/log/butler-eventdet.log 2>&1"
 
 if command -v crontab &>/dev/null; then
   # 检查是否已存在（幂等安装）
   CURRENT=$(crontab -l 2>/dev/null || true)
   NEED_UPDATE=false
 
-  if ! echo "$CURRENT" | grep -q "anomaly_generator.js"; then
-    echo "# LifeButler mockend 异常发生器（每30分钟）" >> /tmp/butler-cron.tmp
+  # 同时清除旧的 anomaly_* 旧条目
+  NEED_CLEANUP=false
+  if echo "$CURRENT" | grep -q "anomaly_generator.js\|anomaly_detector.js"; then
+    NEED_CLEANUP=true
+  fi
+
+  if ! echo "$CURRENT" | grep -q "event_generator.js"; then
+    echo "# LifeButler mockend 事件发生器（每30分钟）" >> /tmp/butler-cron.tmp
     echo "$CRON_GEN" >> /tmp/butler-cron.tmp
     NEED_UPDATE=true
   fi
-  if ! echo "$CURRENT" | grep -q "anomaly_detector.js"; then
-    echo "# LifeButler mockend 异常检测器（每10分钟）" >> /tmp/butler-cron.tmp
+  if ! echo "$CURRENT" | grep -q "event_detector.js"; then
+    echo "# LifeButler mockend 坏事检测器（每10分钟）" >> /tmp/butler-cron.tmp
     echo "$CRON_DET" >> /tmp/butler-cron.tmp
     NEED_UPDATE=true
   fi
 
-  if [ "$NEED_UPDATE" = true ]; then
-    echo "$CURRENT" >> /tmp/butler-cron.tmp
+  if [ "$NEED_UPDATE" = true ] || [ "$NEED_CLEANUP" = true ]; then
+    # 清掉旧 anomaly_* 行后合并新条目
+    echo "$CURRENT" | grep -v "anomaly_generator.js\|anomaly_detector.js" > /tmp/butler-cron.tmp
+    if [ "$NEED_UPDATE" = true ]; then
+      # 重新加 event_* 条目（去重）
+      if ! grep -q "event_generator.js" /tmp/butler-cron.tmp; then
+        echo "$CRON_GEN" >> /tmp/butler-cron.tmp
+      fi
+      if ! grep -q "event_detector.js" /tmp/butler-cron.tmp; then
+        echo "$CRON_DET" >> /tmp/butler-cron.tmp
+      fi
+    fi
     crontab /tmp/butler-cron.tmp
     rm -f /tmp/butler-cron.tmp
-    echo "  system crontab: added generator + detector"
+    echo "  system crontab: updated to event_* (cleaned old anomaly_*)"
   else
     echo "  system crontab: already configured (skip)"
   fi
@@ -136,6 +152,6 @@ fi
 echo ""
 echo "=== Init Complete ==="
 echo "  OpenClaw:  5 wake jobs + 1 hourly sweep"
-echo "  System:    generator (30m) + detector (10m)"
+echo "  System:    event_generator (30m) + event_detector (10m)"
 echo ""
 echo "  验证：openclaw cron list | grep butler"
