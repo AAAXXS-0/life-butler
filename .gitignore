@@ -1,0 +1,24 @@
+node_modules/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env
+.env.local
+*.tmp
+
+# 运行时数据
+mock_backend/state/
+state/
+shared/
+skills/trip-skill/temp/
+agents/*/data/
+agents/*/memory/
+
+# 内部文件
+codes/
+update_docs/
+.openclaw/

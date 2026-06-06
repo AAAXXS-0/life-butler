@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LifeButler 初始化问卷</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; color: #333; }
+  h2 { color: #1a1a1a; margin-bottom: 8px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .q-block { margin-bottom: 28px; }
+  .q-title { font-weight: 600; margin-bottom: 10px; font-size: 15px; }
+  .q-desc { font-size: 13px; color: #888; margin-bottom: 10px; }
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option-btn { padding: 10px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px; background: #fff; cursor: pointer; text-align: left; font-size: 14px; transition: all 0.15s; }
+  .option-btn:hover { border-color: #aaa; background: #fafafa; }
+  .option-btn.selected { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+  .option-btn input { display: none; }
+  .text-input { width: 100%; padding: 10px 12px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  .text-input:focus { outline: none; border-color: #1a73e8; }
+  .submit-btn { width: 100%; padding: 14px; background: #1a73e8; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 32px; }
+  .submit-btn:hover { background: #1557b0; }
+  .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .nav { display: flex; gap: 8px; margin-bottom: 24px; }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: #e0e0e0; }
+  .nav-dot.active { background: #1a73e8; }
+</style>
+</head>
+<body>
+
+<div class="nav" id="nav"></div>
+
+<!-- 问卷内容在 template 内，模型不会扫到 -->
+<template id="user-init-q">
+  <div class="page" id="page"></div>
+</template>
+
+<div id="app"></div>
+
+<script>
+(function() {
+  // 七维数据模型——直接挂载对象，JS 操作而非字符串拼接
+  var answers = {
+    dimension_1_cognitive_style: null,   // 认知风格：详细规划 vs 灵活随意
+    dimension_2_health: null,            // 健康情况：过敏/疾病
+    dimension_3_travel_pref: null,       // 出行偏好：室内 vs 室外
+    dimension_4_budget: null,            // 预算范围
+    dimension_5_location: null,          // 常驻城市
+    dimension_6_time: null,              // 时间偏好
+    dimension_7_social: null             // 社交场景
+  };
+
+  var currentPage = 0;
+
+  var pages = [
+    {
+      title: '规划风格',
+      desc: '你喜欢怎么安排行程？',
+      key: 'dimension_1_cognitive_style',
+      options: [
+        { label: '提前想好每一步，详细规划', value: 'detailed' },
+        { label: '有个大概方向，边走边调整', value: 'flexible' },
+        { label: '看心情，好玩就多待', value: 'spontaneous' }
+      ]
+    },
+    {
+      title: '健康情况',
+      desc: '有没有需要特别留意的？（选填）',
+      key: 'dimension_2_health',
+      options: [
+        { label: '无过敏、无疾病', value: 'none' },
+        { label: '有食物过敏', value: 'food_allergy' },
+        { label: '有慢性病/长期用药', value: 'chronic' },
+        { label: '运动损伤/行动不便', value: 'mobility' },
+        { label: '其他', value: 'other' }
+      ]
+    },
+    {
+      title: '出行偏好',
+      desc: '你更倾向哪种活动？',
+      key: 'dimension_3_travel_pref',
+      options: [
+        { label: '户外、自然、风景', value: 'outdoor' },
+        { label: '室内、展览、演出', value: 'indoor' },
+        { label: '都行，看情况', value: 'mixed' }
+      ]
+    },
+    {
+      title: '预算范围',
+      desc: '每次出行的预算大概在什么水平？',
+      key: 'dimension_4_budget',
+      options: [
+        { label: '经济型：人均 200-500 元/天', value: 'budget' },
+        { label: '舒适型：人均 500-1000 元/天', value: 'comfort' },
+        { label: '品质型：人均 1000-2000 元/天', value: 'quality' },
+        { label: '豪华型：上不封顶', value: 'luxury' }
+      ]
+    },
+    {
+      title: '常驻城市',
+      desc: '你最常在哪个城市？',
+      key: 'dimension_5_location',
+      type: 'text',
+      placeholder: '例如：北京'
+    },
+    {
+      title: '时间偏好',
+      desc: '你通常什么时候有时间出行？',
+      key: 'dimension_6_time',
+      options: [
+        { label: '周末为主', value: 'weekend' },
+        { label: '工作日也可以', value: 'weekday' },
+        { label: '随时，看机会', value: 'anytime' }
+      ]
+    },
+    {
+      title: '出行场景',
+      desc: '你一般和谁一起玩？',
+      key: 'dimension_7_social',
+      options: [
+        { label: '独自一人', value: 'solo' },
+        { label: '和朋友一起', value: 'friends' },
+        { label: '情侣/伴侣', value: 'couple' },
+        { label: '带家人', value: 'family' },
+        { label: '商务/同事', value: 'business' }
+      ]
+    }
+  ];
+
+  function renderNav() {
+    var nav = document.getElementById('nav');
+    nav.innerHTML = '';
+    for (var i = 0; i < pages.length; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'nav-dot' + (i === currentPage ? ' active' : '');
+      nav.appendChild(dot);
+    }
+  }
+
+  function renderPage() {
+    var app = document.getElementById('app');
+    var tmpl = document.getElementById('user-init-q');
+    var clone = tmpl.content.cloneNode(true);
+    var pageEl = clone.getElementById('page');
+
+    var pg = pages[currentPage];
+    var html = '<h2>' + pg.title + '</h2>';
+    html += '<div class="q-desc">' + pg.desc + '</div>';
+    html += '<div class="q-block">';
+
+    if (pg.type === 'text') {
+      html += '<input class="text-input" type="text" id="text-answer" placeholder="' + (pg.placeholder || '') + '">';
+    } else {
+      html += '<div class="options">';
+      for (var i = 0; i < pg.options.length; i++) {
+        var opt = pg.options[i];
+        html += '<label class="option-btn" onclick="selectOpt(this, \'' + opt.value + '\', \'' + pg.key + '\')">';
+        html += '<input type="radio" name="q" value="' + opt.value + '">' + opt.label + '</label>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Navigation buttons
+    var btnCol = currentPage === pages.length - 1 ? '#1a73e8' : '#1a73e8';
+    var btnText = currentPage === pages.length - 1 ? '完成初始化' : '下一步';
+    html += '<button class="submit-btn" id="next-btn" onclick="nextPage()">' + btnText + '</button>';
+    if (currentPage > 0) {
+      html += '<button style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;margin-top:10px" onclick="prevPage()">← 上一题</button>';
+    }
+
+    pageEl.innerHTML = html;
+    app.innerHTML = '';
+    app.appendChild(clone);
+
+    renderNav();
+  }
+
+  window.selectOpt = function(el, value, key) {
+    var siblings = el.parentElement.querySelectorAll('.option-btn');
+    for (var i = 0; i < siblings.length; i++) {
+      siblings[i].classList.remove('selected');
+    }
+    el.classList.add('selected');
+    answers[key] = value;
+  };
+
+  window.nextPage = function() {
+    var pg = pages[currentPage];
+    if (pg.type === 'text') {
+      var val = document.getElementById('text-answer').value.trim();
+      if (!val) { return; }
+      answers[pg.key] = val;
+    }
+    if (currentPage < pages.length - 1) {
+      currentPage++;
+      renderPage();
+    } else {
+      submit();
+    }
+  };
+
+  window.prevPage = function() {
+    if (currentPage > 0) {
+      currentPage--;
+      renderPage();
+    }
+  };
+
+  function submit() {
+    // 打包成 JSON 直接挂载，等 coordinator 来读
+    var result = {
+      type: 'user_init_answers',
+      timestamp: new Date().toISOString(),
+      answers: answers
+    };
+    // 展示结果给用户
+    var app = document.getElementById('app');
+    app.innerHTML = '<h2>✓ 初始化完成</h2><p style="color:#666;font-size:14px">你的偏好已记录，稍后我会根据这些为你安排行程。</p>';
+    // 控制台输出 JSON，coordinator 的 cron 任务可以捞这个
+    console.log('USER_INIT_JSON:' + JSON.stringify(result));
+    // 也可以通过 URL 参数回传（如果飞书支持）
+    if (window.onInitComplete) {
+      window.onInitComplete(result);
+    }
+  }
+
+  renderPage();
+})();
+</script>
+</body>
+</html>

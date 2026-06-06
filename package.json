@@ -1,0 +1,17 @@
+{
+  "name": "life-butler",
+  "version": "1.0.0",
+  "description": "LifeButler — 智能生活管家，行程规划 + 七维记忆 + 异常模拟",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "gen": "node mock_backend/scripts/anomaly_generator.js",
+    "detect": "node mock_backend/scripts/anomaly_detector.js",
+    "phase2": "node skills/trip-skill/phases/phase2_poi_filter.js 北京",
+    "phase3": "node skills/trip-skill/phases/phase3_spatial_optimizer.js",
+    "profile": "node skills/memory-seven-dim-skill/scripts/query_profile.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.14.0"
+  }
+}
