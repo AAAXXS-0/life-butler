@@ -50,36 +50,79 @@
 
 ## 🚀 快速开始
 
-### 1. 启动数据库
+### 0. 一键启动（推荐）
 
 ```bash
+./start.sh        # 装环境：docker → npm → openclaw → 4 agent + skill
+```
+
+按提示：
+- Docker / Node / OpenClaw 自动检查
+- 4 个 agent 装载：`trip-agent` / `account-agent` / `schedule-agent` / `coordinator`
+- extra skill 自动注册到对应 agent
+- 最后打印 coordinator 首次对话流程
+
+**与 init.sh 的区别**：
+- `start.sh` = 装环境（Docker / npm / OpenClaw / agent / skill）
+- `init.sh`  = 启服务（OpenClaw cron job 注册）
+
+> ⚠️  `init.sh` 不能在 coordinator 首次对话之前跑——cron job 提前跑没意义。
+> 顺序：start.sh → 启动 OpenClaw → 跟 coordinator 聊第一次 → `init.sh`
+
+### 1. 手动分步（不用 start.sh）
+
+```bash
+# 1) 启 MySQL
 cp .env.example .env
 docker compose up -d
-```
 
-### 2. 导入数据
-
-```bash
-# 数据库初始化后自动导入 seed.sql + db_schema.sql
-# 手动验证：
-docker exec butler-mysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} -h 127.0.0.1 \
+# 2) 验证 10 张表
+docker exec butler-mysql mysql -uroot -p*** -h 127.0.0.1 \
   --default-character-set=utf8mb4 life_butler_db -e "SHOW TABLES;"
-# 预期输出：10 张表（nodes, edges, node_status, edge_status, events, weather, cache_events, seven_dimensions, promote_log, emergency_events）
-```
 
-### 3. 配置定时任务（Coordinator 初始化）
-
-```bash
-# 在 OpenClaw 环境中运行，注册所有 cron job
-bash coordinator/scripts/init.sh
-```
-
-创建：5 个 Agent 通信唤醒 + 1 个整点巡检 + 2 个系统 crontab（generator/detector）
-
-### 4. 安装依赖 + 测试
-
-```bash
+# 3) 装依赖
 npm install
+
+# 4) 装 OpenClaw
+npm install -g openclaw@2026.6.1
+
+# 5) 装载 4 agent
+for a in trip-agent account-agent schedule-agent; do
+  openclaw agents add $a \
+    --workspace agents/$a \
+    --agent-dir ~/.openclaw/agents/$a/agent \
+    --non-interactive
+done
+openclaw agents add coordinator \
+  --workspace coordinator \
+  --agent-dir ~/.openclaw/agents/coordinator/agent \
+  --non-interactive
+
+# 6) 注册 extra skill
+for s in agents/trip-agent/skills/*/; do
+  openclaw skills install "$s" --agent trip-agent --force
+done
+for s in coordinator/skills/*/; do
+  openclaw skills install "$s" --agent coordinator --force
+done
+```
+
+### 2. 首次对话与 cron 注册
+
+```bash
+# 启动 OpenClaw
+openclaw gateway start
+# 或 openclaw tui
+
+# 跟 coordinator 聊第一次（会自动发 13 道问卷）
+openclaw chat coordinator
+
+# 首次对话后再跑 init.sh 注册 cron job
+bash coordinator/scripts/init.sh
+
+# 验证
+openclaw cron list | grep butler
+```
 
 # POI 筛选（Phase 2）
 MYSQL_PORT=3308 MYSQL_PASSWORD=1 npm run phase2
@@ -149,7 +192,7 @@ butler/
 │       ├── event_generator.js     # 事件发生器（12 事件, 好/坏）
 │       ├── event_detector.js      # 坏事检测器（过滤 is_good=0）
 │       └── README.md
-├── skills/                              # 共享 skill（多 agent 用）
+├── skills/                              # 共享 skill（注册到 coordinator）
 │   ├── memory-layers-skill/SKILL.md
 │   └── memory-seven-dim-skill/
 │       ├── SKILL.md
