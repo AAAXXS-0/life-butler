@@ -182,16 +182,19 @@ if [ -d "$WORKSPACE/coordinator/skills" ]; then
   done
 fi
 
-# 根目录共享 skill（注册到 coordinator）
+# 根目录共享 skill（注册到所有 4 个 agent）
+# memory-layers-skill / memory-seven-dim-skill：所有 agent 都在用
 if [ -d "$WORKSPACE/skills" ]; then
   for skill_dir in "$WORKSPACE/skills"/*/; do
     [ -d "$skill_dir" ] || continue
     slug=$(basename "$skill_dir")
-    if openclaw skills install "$skill_dir" --agent coordinator --force >/dev/null 2>&1; then
-      info "  coordinator/$slug: installed (shared)"
-    else
-      warn "  coordinator/$slug: install failed (continue)"
-    fi
+    for agent in coordinator trip-agent account-agent schedule-agent; do
+      if openclaw skills install "$skill_dir" --agent "$agent" --force >/dev/null 2>&1; then
+        info "  $agent/$slug: installed (shared)"
+      else
+        warn "  $agent/$slug: install failed (continue)"
+      fi
+    done
   done
 fi
 

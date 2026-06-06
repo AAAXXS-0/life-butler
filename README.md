@@ -192,7 +192,7 @@ butler/
 │       ├── event_generator.js     # 事件发生器（12 事件, 好/坏）
 │       ├── event_detector.js      # 坏事检测器（过滤 is_good=0）
 │       └── README.md
-├── skills/                              # 共享 skill（注册到 coordinator）
+├── skills/                              # 共享 skill（所有 4 个 agent 都用）
 │   ├── memory-layers-skill/SKILL.md
 │   └── memory-seven-dim-skill/
 │       ├── SKILL.md
