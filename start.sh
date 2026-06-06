@@ -91,9 +91,9 @@ step "Step 2: 装 npm 依赖"
 npm install
 
 # ============================================
-# Step 3: 装/检查 OpenClaw
+# Step 3: 装 OpenClaw + 运行初始化向导
 # ============================================
-step "Step 3: 装/检查 OpenClaw"
+step "Step 3: 装 OpenClaw + 初始化配置"
 
 if command -v openclaw >/dev/null 2>&1; then
   INSTALLED_VER=$(openclaw --version 2>&1 | grep -oP '2026\.\d+\.\d+' | head -1)
@@ -110,6 +110,11 @@ else
   fi
   info "OpenClaw $OPENCLAW_VERSION 安装完成"
 fi
+
+# 运行初始化向导（阻塞，等用户配完 provider/key/model 等）
+info "启动 OpenClaw 初始化向导..."
+openclaw onboard
+info "向导结束，继续启动流程"
 
 # ============================================
 # Step 4: 装载 4 agent + 注册 skill
