@@ -149,34 +149,35 @@ butler/
 │       ├── event_generator.js     # 事件发生器（12 事件, 好/坏）
 │       ├── event_detector.js      # 坏事检测器（过滤 is_good=0）
 │       └── README.md
-├── skills/
-│   ├── trip-skill/
-│   │   ├── SKILL.md          # 四阶段行程规划
-│   │   └── phases/
-│   │       ├── phase2_poi_filter.js
-│   │       └── phase3_spatial_optimizer.js
-│   ├── memory-seven-dim-skill/
-│   │   ├── SKILL.md          # 七维记忆规范
-│   │   ├── references/
-│   │   │   ├── db_schema.sql # 4 张表
-│   │   │   └── path4_demotion_flow.md
-│   │   └── scripts/
-│   │       ├── promote_cache.js
-│   │       ├── demote_dimension.js
-│   │       ├── query_profile.js
-│   │       └── add_forgotten_item.js
-│   ├── butler-comm-skill/
-│   ├── memory-layers-skill/
-│   ├── subagent-skill/
-│   ├── weather-monitor-skill/SKILL.md     # 天气活动抓取（本地生活）
-│   ├── queue-monitor-skill/SKILL.md       # 餐厅排队监控（本地生活）
-│   ├── traffic-monitor-skill/SKILL.md     # 交通检查（本地生活）
-│   └── nearby-search-skill/SKILL.md       # 附近搜索（本地生活）
+├── skills/                              # 共享 skill（多 agent 用）
+│   ├── memory-layers-skill/SKILL.md
+│   └── memory-seven-dim-skill/
+│       ├── SKILL.md
+│       ├── references/
+│       │   ├── db_schema.sql
+│       │   └── path4_demotion_flow.md
+│       └── scripts/{promote_cache,demote_dimension,query_profile,add_forgotten_item}.js
 ├── agents/
 │   ├── trip-agent/AGENTS.md
+│   │   └── skills/                      # trip-agent 拥有
+│   │       ├── trip-skill/             # 四阶段行程规划
+│   │       │   ├── SKILL.md
+│   │       │   └── phases/phase2_poi_filter.js, phase3_spatial_optimizer.js
+│   │       └── replan-skill/           # 坏事件后调 monitor
+│   │           └── SKILL.md
 │   ├── account-agent/AGENTS.md
 │   ├── schedule-agent/AGENTS.md
-│   └── coordinator/AGENTS.md
+│   └── coordinator/                     # = butler 主代理
+│       ├── AGENTS.md
+│       ├── memory/init-readme.md
+│       ├── scripts/{init.sh, user-init-questionnaire.html}
+│       └── skills/                      # coordinator 拥有
+│           ├── butler-comm-skill/       # A2A 通信
+│           ├── subagent-skill/          # 委托高级封装
+│           ├── weather-monitor-skill/   # 本地生活：天气
+│           ├── queue-monitor-skill/     # 本地生活：排队
+│           ├── traffic-monitor-skill/   # 本地生活：交通
+│           └── nearby-search-skill/     # 本地生活：附近
 └── ARCHITECTURE/
     ├── 00-README.md
     ├── 01-系统架构.md
@@ -189,7 +190,6 @@ butler/
     └── 08-本地生活Skills.md
 ```
 
-> 设计稿：`docs/local-life-skills-design.md`
 
 ---
 

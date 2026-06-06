@@ -16,10 +16,11 @@
 
 | Skill | 主管 | 触发 | 文件 |
 |-------|------|------|------|
-| weather-monitor-skill | Coordinator | trip replan 回调（weather_change=true） | `skills/weather-monitor-skill/SKILL.md` |
-| queue-monitor-skill | Coordinator | trip replan 回调（queue_increase=true） | `skills/queue-monitor-skill/SKILL.md` |
-| traffic-monitor-skill | Coordinator | trip replan 回调（traffic_congestion=true） | `skills/traffic-monitor-skill/SKILL.md` |
-| nearby-search-skill | Coordinator | 用户主动问"附近有啥" | `skills/nearby-search-skill/SKILL.md` |
+| weather-monitor-skill | Coordinator | trip replan 回调（weather_change=true） | `coordinator/skills/weather-monitor-skill/SKILL.md` |
+| queue-monitor-skill | Coordinator | trip replan 回调（queue_increase=true） | `coordinator/skills/queue-monitor-skill/SKILL.md` |
+| traffic-monitor-skill | Coordinator | trip replan 回调（traffic_congestion=true） | `coordinator/skills/traffic-monitor-skill/SKILL.md` |
+| nearby-search-skill | Coordinator | 用户主动问"附近有啥" | `coordinator/skills/nearby-search-skill/SKILL.md` |
+| replan-skill | trip-agent | mockend 坏事件触发后内部使用 | `agents/trip-agent/skills/replan-skill/SKILL.md` |
 
 ---
 
@@ -161,13 +162,25 @@ ALTER TABLE events MODIFY target_type ENUM('node','edge','city') NOT NULL;
 ## 九、文件清单
 
 ```
-skills/
-├── weather-monitor-skill/SKILL.md
-├── queue-monitor-skill/SKILL.md
-├── traffic-monitor-skill/SKILL.md
-├── nearby-search-skill/SKILL.md
-├── replan-skill/                      (现有, trip-agent 内部)
-└── ...
+agents/
+├── trip-agent/
+│   └── skills/
+│       ├── trip-skill/             # 行程规划四阶段
+│       │   ├── SKILL.md
+│       │   └── phases/phase2_poi_filter.js, phase3_spatial_optimizer.js
+│       └── replan-skill/           # 坏事件后调 monitor
+│           └── SKILL.md
+├── coordinator/
+│   └── skills/
+│       ├── butler-comm-skill/      # A2A 通信
+│       ├── subagent-skill/         # 委托封装
+│       ├── weather-monitor-skill/  # 本地生活：天气
+│       ├── queue-monitor-skill/    # 本地生活：排队
+│       ├── traffic-monitor-skill/  # 本地生活：交通
+│       └── nearby-search-skill/    # 本地生活：附近
+skills/                            # 共享 skill
+├── memory-layers-skill/
+└── memory-seven-dim-skill/
 mock_backend/
 ├── index.js                            (+ get_weather, + queue_count/is_indoor)
 ├── seed.sql                            (+ weather 表, + is_indoor/queue_count, + events.is_good)

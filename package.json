@@ -7,8 +7,8 @@
     "db:down": "docker compose down",
     "gen": "node mock_backend/scripts/event_generator.js",
     "detect": "node mock_backend/scripts/event_detector.js",
-    "phase2": "node skills/trip-skill/phases/phase2_poi_filter.js 北京",
-    "phase3": "node skills/trip-skill/phases/phase3_spatial_optimizer.js",
+    "phase2": "node agents/trip-agent/skills/trip-skill/phases/phase2_poi_filter.js 北京",
+    "phase3": "node agents/trip-agent/skills/trip-skill/phases/phase3_spatial_optimizer.js",
     "profile": "node skills/memory-seven-dim-skill/scripts/query_profile.js"
   },
   "dependencies": {
