@@ -33,12 +33,12 @@ skills/memory-seven-dim/
 ├── scripts/
 │   ├── promote_cache.js        → 晋升脚本（定时 + 主管Agent顺手）
 │   ├── query_profile.js        → 查询画像脚本
-│   └── demote_dimension.js     → 降级脚本（仅主管Agent调用）
+│   ├── demote_dimension.js     → 降级脚本（仅主管Agent调用）
+|   └── add_forgotten_item.js   → 遗忘清单写入脚本
 ├── references/
-│   ├── db_schema.sql            → MySQL 建表 SQL（待补充）
-│   └── path4_demotion_flow.md   → 降级流程详解（待补充）
-└── assets/
-    └── （预留）
+│   ├── db_schema.sql            → MySQL 建表 SQL
+└─  └── path4_demotion_flow.md   → 降级流程详解
+
 ```
 
 ---
@@ -51,7 +51,7 @@ skills/memory-seven-dim/
 - **表3**：`promote_log`（晋升日志）
 - **表4**：`emergency_events`（突发事件临时覆盖层）
 
-详见 `references/db_schema.sql`（待补充）。
+详见 `references/db_schema.sql`。
 
 ---
 
@@ -154,7 +154,7 @@ node skills/memory-seven-dim/scripts/query_profile.js <dimension> [sub_key]
    - 矛盾证据追加到被降级侧写的 evidence_list
    - seven_dimensions status → 'demoted'，demoted_at = NOW()
 
-详见 `references/path4_demotion_flow.md`（待补充）。
+详见 `references/path4_demotion_flow.md`。
 
 ---
 
