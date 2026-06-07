@@ -66,7 +66,9 @@
 
 **Trip Agent 不在 Heartbeat 链里** — 它的唤醒只有两条路：mockend 异常检测器、Coordinator 委托。
 
-完整架构图（含 cron/事件流）见 [docs/architecture-diagram.html](docs/architecture-diagram.html)。
+![LifeButler 架构图](docs/butleragent-v2.drawio.svg)
+
+> 源文件：[butleragent-v2.drawio.svg](docs/butleragent-v2.drawio.svg)（draw.io 可编辑）
 
 ---
 
@@ -398,7 +400,7 @@ butler/
 │       └── nearby-search-skill/    #   本地生活：附近
 │
 ├── docs/
-│   ├── architecture-diagram.html   # 可视化架构图（浏览器打开）
+│   ├── butleragent-v2.drawio.svg   # 架构图（draw.io 导出）
 │   └── local-life-skills-design.md # 本地生活 skill 设计稿
 │
 └── ARCHITECTURE/        # 权威架构文档
