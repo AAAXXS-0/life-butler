@@ -23,52 +23,10 @@
 
 ## 架构
 
-```
-                    ┌───────────────┐
-                    │  用户（飞书）   │
-                    └───────┬───────┘
-                            │ 消息
-                            ▼
-            ┌───────────────────────────────┐
-            │       Coordinator（主入口）      │
-            │  意图识别 → 路由 → 组装回复      │
-            │  Heartbeat（整点）→ 触发下面 ↓   │
-            └────┬──────────────────────┬────┘
-                 │                      │
-        ┌────────┴────┐                 │
-        │ cron run   │                  │ 委托 / 通信
-        │ （链式）     │                  ▼
-        ▼            ▼           ┌──────────────┐
-   ┌────────┐  ┌────────┐        │ 4 个收件箱    │
-   │Schedule│  │Account │        │  shared/     │
-   │ Agent  │  │ Agent  │        │  (JSON 文件) │
-   └────┬───┘  └────┬───┘        └──────────────┘
-        │           │
-        │ mockend   │ mockend
-        │ 异常推    │ 异常推
-        ▼           ▼
-   ┌──────────────────────────────────────┐
-   │       MySQL: life_butler_db          │
-   │                                      │
-   │  图模型（4 表）  │  天气（1 表）       │
-   │  nodes          │  weather           │
-   │  edges          │                    │
-   │  node_status    │                    │
-   │  edge_status    │                    │
-   │                                      │
-   │  七维记忆（4 表）                      │
-   │  cache_events                       │
-   │  seven_dimensions                    │
-   │  promote_log                         │
-   │  emergency_events                    │
-   └──────────────────────────────────────┘
-```
-
-**Trip Agent 不在 Heartbeat 链里** — 它的唤醒只有两条路：mockend 异常检测器、Coordinator 委托。
 
 ![LifeButler 架构图](docs/butleragent-v2.drawio.svg)
 
-> 源文件：[butleragent-v2.drawio.svg](docs/butleragent-v2.drawio.svg)（draw.io 可编辑）
+> 源文件：[butleragent-v2.drawio.svg](docs/butleragent-v2.drawio.svg)
 
 ---
 
