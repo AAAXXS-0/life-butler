@@ -234,16 +234,12 @@ node --version          # v18.x 或 v20.x
 python3 --version       # Python 3.8+
 ```
 
-**WSL 特别提醒**：
-- WSL2 推荐装 Docker Desktop for Windows 并启用 WSL 集成
-- 如果实验田 OS 是裸 WSL，需手动装 Docker Engine（`get.docker.com` 脚本可用）
-- Docker daemon 在 WSL 里可能需要 `sudo dockerd &` 手动启动（如果没启用 systemd）
 
 ---
 
 ## 快速开始
 
-### 一键启动（推荐）
+### 一键启动
 
 ```bash
 ./start.sh
@@ -302,6 +298,7 @@ for s in skills/*/; do
 done
 
 # 6) 首次对话后注册 cron
+# 理论上这个会在coordinator第一次进行聊天时被启用，若未启用，可能需要手动启动：
 bash coordinator/scripts/init.sh
 ```
 
