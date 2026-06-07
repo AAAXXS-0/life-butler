@@ -213,6 +213,34 @@ shared/
 
 ---
 
+## 前置条件
+
+> **本脚本不自动装以下依赖**（需 sudo / 破坏性系统操作）。装机或换机后**手动装一次**。
+
+| 依赖 | 最低版本 | 装命令（Ubuntu / Debian） |
+|------|---------|---------------------------|
+| **Docker** | 20.10+ | `curl -fsSL https://get.docker.com \| sh` |
+| **Docker Compose v2** | v2.x | 随 Docker Engine 一起装（`docker-compose-plugin`） |
+| **Node.js** | ≥18 | `curl -fsSL https://deb.nodesource.com/setup_18.x \| sudo -E bash - && sudo apt-get install -y nodejs` |
+| **Python3** | 3.8+ | `sudo apt-get install -y python3` |
+| **OpenClaw** | 2026.6.1+ | `./start.sh` 会自动装（`npm install -g openclaw`） |
+
+**验证**：
+
+```bash
+docker --version        # Docker version 20.10+
+docker compose version  # Docker Compose version v2.x+
+node --version          # v18.x 或 v20.x
+python3 --version       # Python 3.8+
+```
+
+**WSL 特别提醒**：
+- WSL2 推荐装 Docker Desktop for Windows 并启用 WSL 集成
+- 如果实验田 OS 是裸 WSL，需手动装 Docker Engine（`get.docker.com` 脚本可用）
+- Docker daemon 在 WSL 里可能需要 `sudo dockerd &` 手动启动（如果没启用 systemd）
+
+---
+
 ## 快速开始
 
 ### 一键启动（推荐）

@@ -4,12 +4,15 @@
 # 适用：拿到项目后第一步
 #
 # 与 init.sh 的区别：
-#   - start.sh = 装环境（Docker / npm / OpenClaw / agent / skill）
+#   - start.sh = 检查环境（Docker / Python3 / Node） + 装项目依赖（npm / OpenClaw binary / agent / skill） + 启 MySQL
 #   - init.sh  = 启服务（OpenClaw cron job 注册，要求 coordinator 已首次对话过）
 #
-# 顺序：docker → npm → openclaw → agent → print
+# 顺序：env-check → mysql → npm → openclaw → agent → print
 # 幂等：每步检测已做过的会跳过
 # 失败：fail fast，不回滚
+#
+# 注意：Docker / Python3 / Node 是**前置条件**，本脚本不自动装（要 sudo，破坏性系统操作）。
+#       装命令见 README.md "前置条件" 节。
 # ============================================
 set -e
 
@@ -33,15 +36,17 @@ step()  { echo -e "\n${BLUE}=== $* ===${NC}"; }
 cd "$WORKSPACE"
 
 # ============================================
-# Step 0: 前置检查
+# Step 0: 前置检查（Docker / Python3 / Node 必需，本脚本不装）
 # ============================================
 step "Step 0: 前置检查"
-command -v docker >/dev/null 2>&1 || { err "需要 Docker"; exit 1; }
-command -v node  >/dev/null 2>&1 || { err "需要 Node.js ≥18"; exit 1; }
+command -v docker >/dev/null 2>&1 || { err "需要 Docker。装：curl -fsSL https://get.docker.com | sh"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { err "需要 Python3。装：sudo apt-get install -y python3"; exit 1; }
+command -v node  >/dev/null 2>&1 || { err "需要 Node.js ≥18。装：curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"; exit 1; }
 DOCKER_VER=$(docker --version)
 NODE_VER=$(node --version)
-info "Docker: $DOCKER_VER"
-info "Node:   $NODE_VER"
+info "Docker:   $DOCKER_VER"
+info "Python3:  $(python3 --version)"
+info "Node:     $NODE_VER"
 
 # ============================================
 # Step 1: 启 MySQL
