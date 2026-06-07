@@ -221,7 +221,7 @@ shared/
 |------|---------|---------------------------|
 | **Docker** | 20.10+ | `curl -fsSL https://get.docker.com \| sh` |
 | **Docker Compose v2** | v2.x | 随 Docker Engine 一起装（`docker-compose-plugin`） |
-| **Node.js** | ≥20 | `curl -fsSL https://deb.nodesource.com/setup_20.x \| sudo -E bash - && sudo apt-get install -y nodejs` |
+| **Node.js** | ≥22.19 | `curl -fsSL https://deb.nodesource.com/setup_24.x \| sudo -E bash - && sudo apt-get install -y nodejs` |
 | **Python3** | 3.8+ | `sudo apt-get install -y python3` |
 | **OpenClaw** | 2026.6.1+ | `./start.sh` 会自动装（`npm install -g openclaw`） |
 
@@ -230,7 +230,7 @@ shared/
 ```bash
 docker --version        # Docker version 20.10+
 docker compose version  # Docker Compose version v2.x+
-node --version          # v20.x
+node --version          # v24.x or ≥v22.19
 python3 --version       # Python 3.8+
 ```
 
