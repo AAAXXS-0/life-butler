@@ -382,7 +382,7 @@ butler/
 - **图算法**：自实现 Dijkstra（无外部库）
 - **聚类**：自实现 K-Means
 - **依赖**：仅 `mysql2` 一个 npm 包
-- **Agent框架**：OpenClaw
+- **Agent框架**：OpenClaw v2026.6.1
 
 ---
 
