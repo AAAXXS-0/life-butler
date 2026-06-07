@@ -14,6 +14,7 @@ Thumbs.db
 mock_backend/state/
 state/
 shared/
+!shared/taxonomy.json
 skills/trip-skill/temp/
 agents/*/data/
 agents/*/memory/

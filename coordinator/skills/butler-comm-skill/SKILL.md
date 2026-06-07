@@ -22,7 +22,7 @@ workspace-butler/shared/                # 通信根目录（共享文件夹）
 │   └── YYYY-MM-DD.json
 ├── account-agent/                      # account-agent 的收件箱
 │   └── YYYY-MM-DD.json
-└── taxonomy.json                       # 静态通讯录/分类规则
+└── taxonomy.json                       # 静态通讯录 + cron job ID 映射
 ```
 
 **核心原则**：
@@ -45,9 +45,49 @@ workspace-butler/shared/                # 通信根目录（共享文件夹）
 
 ## 通讯录（addressbook）
 
-通讯录 = 文件系统结构本身。**4 个收件箱 = 4 个可达 agent**。
+通讯录 = `shared/taxonomy.json`（静态文件）。Agent 启动时读这个文件获取：
+1. 4 个 agent 的元信息（角色 / 收件箱 / wake cron 名 / session_key）
+2. **各 wake cron job 的 ID**（用于 `openclaw cron run <id>` 唤醒）—— init.sh 创建后写入
+3. 消息分类规则（task_delegate / result_callback / info_share 的语义）
 
-每个 agent 都知道自己有哪些收件箱可写、谁来读它：
+`taxonomy.json` 三段结构（详见文件内）：
+
+```json
+{
+  "version": 1,
+  "agents": {
+    "trip-agent": { "role": "...", "inbox": "shared/trip-agent/", "wake_cron_name": "butler-trip-agent-wake", "session_key": "session:butler-trip-agent:inbox" },
+    "..."
+  },
+  "cron_jobs": {
+    "trip-agent":     "<uuid>",
+    "schedule-agent": "<uuid>",
+    "account-agent":  "<uuid>",
+    "coordinator":    "<uuid>",
+    "self":           "<uuid>"
+  },
+  "hourly_sweep_cron_id": "<uuid>",
+  "taxonomy": { "message_types": { ... } }
+}
+```
+
+### 怎么读 taxonomy.json 拿 wake ID
+
+子 agent 跑完要唤醒 coordinator 时，**不要**靠记忆里的 ID 字符串，从 taxonomy.json 读：
+
+```bash
+COORD_ID=$(python3 -c "import json; print(json.load(open('shared/taxonomy.json'))['cron_jobs']['coordinator'])")
+openclaw cron run "$COORD_ID"
+```
+
+为什么这样设计：
+- OpenClaw 的 `cron add` 返回的 ID 是**随机 UUID**（如 `3142739c-fc3b-...`）
+- 不存下来就会丢，agent 们互相找不到
+- 存到 taxonomy.json 后所有 agent 共读、单一权威来源
+
+### 收件箱可达性（与 taxonomy.json 一致）
+
+4 个收件箱 = 4 个可达 agent。每个 agent 知道：
 
 | agent | 自己的收件箱（被读） | 可写的收件箱（发送） |
 |-------|---------------------|---------------------|

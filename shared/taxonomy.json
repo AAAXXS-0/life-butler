@@ -1,0 +1,49 @@
+{
+  "_comment": "LifeButler 静态通讯录。所有 agent 启动时读这个文件获取：1) 4 个 agent 的元信息 2) 各自 wake cron job 的 ID（用于 cron run 唤醒）3) 消息分类规则。位置：shared/taxonomy.json（与 shared/<agent>/ 收件箱同级）。",
+  "_version_note": "version=1 起步。init.sh 跑完会写入 cron_jobs 实际 ID。手动维护时只改 agents/taxonomy 段，cron_jobs 段由 init.sh 自动覆盖。",
+  "version": 1,
+  "updated_at": "2026-06-07T21:12:00+08:00",
+  "agents": {
+    "coordinator": {
+      "role": "主入口，意图识别+路由+组装回复",
+      "inbox": "shared/coordinator/",
+      "wake_cron_name": "butler-coordinator-wake",
+      "session_key": "session:butler-coordinator:inbox"
+    },
+    "trip-agent": {
+      "role": "行程规划、动态调整、预算边界",
+      "inbox": "shared/trip-agent/",
+      "wake_cron_name": "butler-trip-agent-wake",
+      "session_key": "session:butler-trip-agent:inbox"
+    },
+    "schedule-agent": {
+      "role": "日程备忘、习惯追踪、遗忘清单",
+      "inbox": "shared/schedule-agent/",
+      "wake_cron_name": "butler-schedule-agent-wake",
+      "session_key": "session:butler-schedule-agent:inbox"
+    },
+    "account-agent": {
+      "role": "账本管理、预算预警、努力目标",
+      "inbox": "shared/account-agent/",
+      "wake_cron_name": "butler-account-agent-wake",
+      "session_key": "session:butler-account-agent:inbox"
+    }
+  },
+  "cron_jobs": {
+    "_comment": "wake job ID 映射。init.sh 创建后写入。Agent 要 cron run <id> 唤醒某 agent 时，从这里读 ID（不直接传 ID，改用 helper：read_cron_id('trip-agent')）。",
+    "trip-agent": "",
+    "schedule-agent": "",
+    "account-agent": "",
+    "coordinator": "",
+    "self": ""
+  },
+  "hourly_sweep_cron_id": "",
+  "taxonomy": {
+    "_comment": "消息类型分类规则（task_delegate / result_callback / info_share 的语义约定）",
+    "message_types": {
+      "task_delegate": "任务委托（coordinator 派发任务给子 agent）",
+      "result_callback": "结果回调（子 agent 返回处理结果）",
+      "info_share": "信息共享（agent 之间流转信息）"
+    }
+  }
+}
