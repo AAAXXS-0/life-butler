@@ -1,266 +1,60 @@
 <!doctype html>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>LifeButler 架构图</title>
+<title>LifeButler 架构图（ASCII）</title>
 <style>
-  :root {
-    --bg: #0f172a;
-    --fg: #e5e7eb;
-    --muted: #64748b;
-    --line: #475569;
-    --neutral: #1e293b;
-    --input: #1e3a5f;
-    --process: #312e81;
-    --storage: #134e4a;
-    --external: #78350f;
-    --shared: #451a03;
-    --monitor: #14532d;
-    --text-input: #93c5fd;
-    --text-process: #c4b5fd;
-    --text-storage: #5eead4;
-    --text-shared: #fcd34d;
-    --text-monitor: #86efac;
-  }
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font: 14px/1.4 ui-sans-serif, system-ui, sans-serif;
+    background: #0f172a;
+    color: #e5e7eb;
+    font: 13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    padding: 32px;
   }
-  main { max-width: 1400px; margin: 32px auto; padding: 0 20px; }
-  svg { width: 100%; height: auto; display: block; }
-  .title { font-size: 20px; font-weight: 700; fill: var(--fg); }
-  .label { font-size: 13px; font-weight: 600; fill: var(--fg); }
-  .small { font-size: 11px; fill: var(--muted); }
-  .legend-label { font-size: 12px; fill: var(--fg); }
-  .node { stroke: var(--line); stroke-width: 1.5; }
-  .neutral { fill: var(--neutral); }
-  .input { fill: var(--input); }
-  .process { fill: var(--process); }
-  .storage { fill: var(--storage); }
-  .external { fill: var(--external); }
-  .shared { fill: var(--shared); }
-  .monitor { fill: var(--monitor); }
-  .edge { stroke: var(--line); stroke-width: 1.5; fill: none; }
-  .zone { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.6; }
-  .dashed { stroke-dasharray: 5 4; }
-  .arrow { marker-end: url(#arrow); }
-  .arrow-dashed { stroke-dasharray: 5 4; }
-  text { pointer-events: none; }
+  pre {
+    color: #e5e7eb;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre;
+  }
+  h1 { font-size: 18px; color: #cbd5e1; margin: 0 0 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
 </style>
-<main>
-<svg viewBox="0 0 1400 760" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <defs>
-    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0,0 L8,4 L0,8 Z" fill="#475569"/>
-    </marker>
-  </defs>
-
-  <!-- ===================== TITLE ===================== -->
-  <text x="700" y="38" text-anchor="middle" class="title">LifeButler 系统架构</text>
-
-  <!-- ===================== LEGEND ===================== -->
-  <rect x="1100" y="18" width="14" height="14" rx="3" fill="var(--input)" stroke="var(--line)" stroke-width="1.5"/>
-  <text x="1120" y="29" class="legend-label">用户入口</text>
-
-  <rect x="1100" y="38" width="14" height="14" rx="3" fill="var(--process)" stroke="var(--line)" stroke-width="1.5"/>
-  <text x="1120" y="49" class="legend-label">Agent</text>
-
-  <rect x="1100" y="58" width="14" height="14" rx="3" fill="var(--storage)" stroke="var(--line)" stroke-width="1.5"/>
-  <text x="1120" y="69" class="legend-label">数据存储</text>
-
-  <rect x="1100" y="78" width="14" height="14" rx="3" fill="var(--shared)" stroke="var(--line)" stroke-width="1.5"/>
-  <text x="1120" y="89" class="legend-label">通信通道</text>
-
-  <rect x="1100" y="98" width="14" height="14" rx="3" fill="var(--monitor)" stroke="var(--line)" stroke-width="1.5"/>
-  <text x="1120" y="109" class="legend-label">Monitor Skill</text>
-
-  <!-- ===================== ZONE: Coordinator ===================== -->
-  <rect x="420" y="72" width="360" height="330" rx="12" class="zone"/>
-  <text x="600" y="93" text-anchor="middle" class="small">coordinator</text>
-
-  <!-- ===================== ZONE: Agents ===================== -->
-  <rect x="900" y="72" width="450" height="210" rx="12" class="zone"/>
-  <text x="1125" y="93" text-anchor="middle" class="small">agents</text>
-
-  <!-- ===================== ZONE: Data ===================== -->
-  <rect x="900" y="310" width="450" height="410" rx="12" class="zone"/>
-  <text x="1125" y="331" text-anchor="middle" class="small">data layer</text>
-
-  <!-- ===================== USER ===================== -->
-  <rect x="40" y="72" width="160" height="70" rx="10" class="node input"/>
-  <text x="120" y="103" text-anchor="middle" class="label" fill="var(--text-input)">用户</text>
-  <text x="120" y="120" text-anchor="middle" class="small" fill="var(--text-input)">飞书</text>
-
-  <!-- ===================== SHARED FOLDER ===================== -->
-  <rect x="40" y="310" width="200" height="70" rx="10" class="node shared"/>
-  <text x="140" y="338" text-anchor="middle" class="label" fill="var(--text-shared)">shared/</text>
-  <text x="140" y="355" text-anchor="middle" class="small" fill="var(--text-shared)">异步消息通道</text>
-
-  <!-- ===================== CRON JOBS ===================== -->
-  <rect x="40" y="420" width="200" height="70" rx="10" class="node" style="fill:var(--neutral); stroke: var(--line);"/>
-  <text x="140" y="448" text-anchor="middle" class="label">Cron Jobs</text>
-  <text x="140" y="465" text-anchor="middle" class="small">唤醒 Agent</text>
-
-  <!-- ===================== COORDINATOR ===================== -->
-  <rect x="470" y="115" width="260" height="80" rx="10" class="node process"/>
-  <text x="600" y="145" text-anchor="middle" class="label" fill="var(--text-process)">Coordinator</text>
-  <text x="600" y="162" text-anchor="middle" class="small" fill="var(--text-process)">意图识别 · 路由 · 组装回复</text>
-  <text x="600" y="178" text-anchor="middle" class="small" fill="var(--text-process)">主动服务（Heartbeat）</text>
-
-  <!-- ===================== MONITOR SKILLS (under Coordinator) ===================== -->
-  <rect x="480" y="215" width="105" height="50" rx="8" class="node monitor"/>
-  <text x="532" y="235" text-anchor="middle" class="label" fill="var(--text-monitor)" style="font-size:11px">天气 Monitor</text>
-  <text x="532" y="250" text-anchor="middle" class="small" fill="var(--text-monitor)">weather</text>
-
-  <rect x="595" y="215" width="105" height="50" rx="8" class="node monitor"/>
-  <text x="647" y="235" text-anchor="middle" class="label" fill="var(--text-monitor)" style="font-size:11px">排队 Monitor</text>
-  <text x="647" y="250" text-anchor="middle" class="small" fill="var(--text-monitor)">queue</text>
-
-  <rect x="480" y="275" width="105" height="50" rx="8" class="node monitor"/>
-  <text x="532" y="295" text-anchor="middle" class="label" fill="var(--text-monitor)" style="font-size:11px">交通 Monitor</text>
-  <text x="532" y="310" text-anchor="middle" class="small" fill="var(--text-monitor)">traffic</text>
-
-  <rect x="595" y="275" width="105" height="50" rx="8" class="node monitor"/>
-  <text x="647" y="295" text-anchor="middle" class="label" fill="var(--text-monitor)" style="font-size:11px">附近 Monitor</text>
-  <text x="647" y="310" text-anchor="middle" class="small" fill="var(--text-monitor)">nearby</text>
-
-  <!-- ===================== TRIP AGENT ===================== -->
-  <rect x="920" y="115" width="150" height="65" rx="10" class="node process"/>
-  <text x="995" y="143" text-anchor="middle" class="label" fill="var(--text-process)">Trip Agent</text>
-  <text x="995" y="160" text-anchor="middle" class="small" fill="var(--text-process)">行程规划 · 动态调整</text>
-
-  <!-- ===================== SCHEDULE AGENT ===================== -->
-  <rect x="1090" y="115" width="150" height="65" rx="10" class="node process"/>
-  <text x="1165" y="143" text-anchor="middle" class="label" fill="var(--text-process)">Schedule Agent</text>
-  <text x="1165" y="160" text-anchor="middle" class="small" fill="var(--text-process)">日程备忘 · 习惯追踪</text>
-
-  <!-- ===================== ACCOUNT AGENT ===================== -->
-  <rect x="1260" y="115" width="150" height="65" rx="10" class="node process"/>
-  <text x="1335" y="143" text-anchor="middle" class="label" fill="var(--text-process)">Account Agent</text>
-  <text x="1335" y="160" text-anchor="middle" class="small" fill="var(--text-process)">账本管理 · 消费分析</text>
-
-  <!-- ===================== SKILLS (under agents) ===================== -->
-  <rect x="920" y="195" width="150" height="65" rx="8" class="node" style="fill:#1e1b4b; stroke:var(--line);"/>
-  <text x="995" y="223" text-anchor="middle" class="label" fill="#c4b5fd" style="font-size:11px">trip-skill</text>
-  <text x="995" y="240" text-anchor="middle" class="small" fill="#c4b5fd">四阶段行程规划</text>
-  <text x="995" y="254" text-anchor="middle" class="small" fill="#c4b5fd">replan-skill ·事件处理</text>
-
-  <rect x="1090" y="195" width="150" height="65" rx="8" class="node" style="fill:#1e1b4b; stroke:var(--line);"/>
-  <text x="1165" y="223" text-anchor="middle" class="label" fill="#c4b5fd" style="font-size:11px">专属 skill</text>
-  <text x="1165" y="240" text-anchor="middle" class="small" fill="#c4b5fd">schedule-skill</text>
-
-  <rect x="1260" y="195" width="150" height="65" rx="8" class="node" style="fill:#1e1b4b; stroke:var(--line);"/>
-  <text x="1335" y="223" text-anchor="middle" class="label" fill="#c4b5fd" style="font-size:11px">专属 skill</text>
-  <text x="1335" y="240" text-anchor="middle" class="small" fill="#c4b5fd">account-skill</text>
-
-  <!-- ===================== MYSQL DATABASE ===================== -->
-  <rect x="920" y="320" width="430" height="390" rx="12" class="node storage"/>
-  <text x="1135" y="345" text-anchor="middle" class="label" fill="var(--text-storage)">MySQL: life_butler_db（10 张表）</text>
-
-  <!-- DB table rows -->
-  <rect x="940" y="360" width="190" height="155" rx="6" style="fill:#0d3632; stroke:#0f766e; stroke-width:1;"/>
-  <text x="1035" y="378" text-anchor="middle" class="small" fill="#5eead4">Mock Backend</text>
-  <text x="955" y="396" class="small" fill="#5eead4">nodes</text>
-  <text x="955" y="411" class="small" fill="#5eead4">edges</text>
-  <text x="955" y="426" class="small" fill="#5eead4">node_status</text>
-  <text x="955" y="441" class="small" fill="#5eead4">edge_status</text>
-  <text x="955" y="456" class="small" fill="#5eead4">events（is_good 标记）</text>
-  <text x="955" y="471" class="small" fill="#5eead4">weather</text>
-  <text x="955" y="486" class="small" fill="#5eead4">→ 图模型数据</text>
-
-  <rect x="1145" y="360" width="190" height="155" rx="6" style="fill:#0d3632; stroke:#0f766e; stroke-width:1;"/>
-  <text x="1240" y="378" text-anchor="middle" class="small" fill="#5eead4">七维记忆</text>
-  <text x="1160" y="396" class="small" fill="#5eead4">cache_events</text>
-  <text x="1160" y="411" class="small" fill="#5eead4">seven_dimensions</text>
-  <text x="1160" y="426" class="small" fill="#5eead4">promote_log</text>
-  <text x="1160" y="441" class="small" fill="#5eead4">emergency_events</text>
-  <text x="1160" y="456" class="small" fill="#5eead4">→ 画像数据</text>
-
-  <!-- DB scripts -->
-  <rect x="940" y="530" width="190" height="75" rx="6" style="fill:#0d3632; stroke:#0f766e; stroke-width:1;"/>
-  <text x="1035" y="548" text-anchor="middle" class="small" fill="#5eead4">Scripts</text>
-  <text x="955" y="564" class="small" fill="#5eead4">event_generator.js</text>
-  <text x="955" y="579" class="small" fill="#5eead4">event_detector.js</text>
-  <text x="955" y="594" class="small" fill="#5eead4">phase2_poi_filter.js</text>
-
-  <rect x="1145" y="530" width="190" height="75" rx="6" style="fill:#0d3632; stroke:#0f766e; stroke-width:1;"/>
-  <text x="1240" y="548" text-anchor="middle" class="small" fill="#5eead4">Scripts</text>
-  <text x="1160" y="564" class="small" fill="#5eead4">phase3_spatial_optimizer.js</text>
-  <text x="1160" y="579" class="small" fill="#5eead4">promote_cache.js</text>
-  <text x="1160" y="594" class="small" fill="#5eead4">query_profile.js</text>
-
-  <!-- ===================== SHARED SKILLS ===================== -->
-  <rect x="40" y="180" width="200" height="110" rx="10" class="node shared"/>
-  <text x="140" y="202" text-anchor="middle" class="label" fill="var(--text-shared)">共享 Skills</text>
-  <text x="55" y="220" class="small" fill="var(--text-shared)">memory-layers-skill</text>
-  <text x="55" y="235" class="small" fill="var(--text-shared)">memory-seven-dim-skill</text>
-  <text x="55" y="250" class="small" fill="var(--text-shared)">butler-comm-skill</text>
-  <text x="55" y="265" class="small" fill="var(--text-shared)">subagent-skill</text>
-
-  <!-- ===================== CONNECTORS ===================== -->
-
-  <!-- User → Coordinator -->
-  <path d="M120,142 L470,155" class="edge arrow" style="stroke-width:2"/>
-
-  <!-- Coordinator → shared/ (dashed, cron run trigger) -->
-  <path d="M470,155 Q340,155340,310 L240,310" class="edge arrow arrow-dashed" style="stroke: var(--text-shared); stroke-width:1.5;"/>
-
-  <!-- shared/ → Cron Jobs -->
-  <path d="M140,380 L140,420" class="edge arrow" style="stroke: var(--text-shared);"/>
-
-  <!-- shared/ → Trip Agent (reply) -->
-  <path d="M240,345 L920,148" class="edge arrow arrow-dashed" style="stroke: var(--text-shared);"/>
-
-  <!-- shared/ → Schedule Agent (reply) -->
-  <path d="M240,345 L1090,148" class="edge arrow arrow-dashed" style="stroke: var(--text-shared);"/>
-
-  <!-- shared/ → Account Agent (reply) -->
-  <path d="M240,345 L1260,148" class="edge arrow arrow-dashed" style="stroke: var(--text-shared);"/>
-
-  <!-- Cron Jobs → Coordinator (wake) -->
-  <path d="M240,420 L240,195 Q240,155 470,155" class="edge arrow-dashed" style="stroke-width:1.5;"/>
-
-  <!-- Cron Jobs → Trip Agent -->
-  <path d="M140,490 L920,195" class="edge arrow arrow-dashed"/>
-
-  <!-- Cron Jobs → Schedule Agent -->
-  <path d="M140,490 L1090,195" class="edge arrow arrow-dashed"/>
-
-  <!-- Cron Jobs → Account Agent -->
-  <path d="M140,490 L1260,195" class="edge arrow arrow-dashed"/>
-
-  <!-- Coordinator → Trip Agent (委托) -->
-  <path d="M730,155 L920,148" class="edge arrow" style="stroke-width:1.5; stroke:#818cf8;"/>
-
-  <!-- Coordinator → Schedule Agent -->
-  <path d="M730,155 L1090,148" class="edge arrow" style="stroke-width:1.5; stroke:#818cf8;"/>
-
-  <!-- Coordinator → Account Agent -->
-  <path d="M730,155 L1260,148" class="edge arrow" style="stroke-width:1.5; stroke:#818cf8;"/>
-
-  <!-- Trip Agent → MySQL -->
-  <path d="M995,180 L995,320" class="edge arrow"/>
-
-  <!-- Schedule Agent → MySQL -->
-  <path d="M1165,180 L1165,320" class="edge arrow"/>
-
-  <!-- Account Agent → MySQL -->
-  <path d="M1335,180 L1335,320" class="edge arrow"/>
-
-  <!-- Coordinator → MySQL (read profile) -->
-  <path d="M600,195 L600,320" class="edge arrow" style="stroke:#818cf8;"/>
-
-  <!-- Coordinator monitor skills → MySQL (read current status) -->
-  <path d="M532,265 L532,320" class="edge arrow" style="stroke:#22c55e; stroke-width:1;"/>
-  <path d="M647,265 L647,320" class="edge arrow" style="stroke:#22c55e; stroke-width:1;"/>
-  <path d="M532,325 L532,360" class="edge arrow" style="stroke:#22c55e; stroke-width:1;"/>
-  <path d="M647,325 L647,360" class="edge arrow" style="stroke:#22c55e; stroke-width:1;"/>
-
-  <!-- ===================== LABELS ===================== -->
-  <text x="385" y="148" class="small" style="fill:var(--text-shared)">cron run</text>
-  <text x="710" y="148" class="small" style="fill:#818cf8">委托</text>
-  <text x="710" y="260" class="small" style="fill:#22c55e">monitor 查询</text>
-
-</svg>
-</main>
+<h1>LifeButler 架构图</h1>
+<pre>
+                          用户 (飞书)
+                             │
+                             │ 消息
+                             ▼
+                       ┌──────────────┐
+                       │ Coordinator  │
+                       │   (主入口)   │
+                       │  Heartbeat   │
+                       └──┬─────┬────┘
+                          │     │
+               ┌──────────┘     └──────────┐
+               │                            │
+          cron run 触发              委托 / 通信
+               │                            │
+               ▼                            ▼
+          ┌──────────┐  ┌──────┐  ┌──────────┐
+          │ Schedule │  │ Trip │  │ Account  │
+          │  Agent   │  │Agent │  │  Agent   │
+          │ 日程·习惯│  │ 行程 │  │账本·预算│
+          └────┬─────┘  └──┬───┘  └─────┬────┘
+               │           │            │
+               └─────┬─────┴──────┬─────┘
+                     │            │
+                     ▼            ▼
+               ┌─────────────────────────┐
+               │ MySQL: life_butler_db   │
+               │  10 张表                │
+               │  图模型 4 + 天气 1      │
+               │  七维 4 + events 1      │
+               └────────────┬────────────┘
+                            ▲
+                            │
+                   ┌────────┴────────┐
+                   │  系统 crontab   │
+                   │  gen  (30m)    │
+                   │  detect (10m)  │
+                   │   └─► 推 trip  │
+                   └─────────────────┘
+</pre>
