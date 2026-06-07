@@ -250,6 +250,7 @@ python3 --version       # Python 3.8+
 `openclaw onboard` 是首次配置向导，请填模型 provider、API key、Gateway 配置。
 
 > ⚠️ `init.sh` 必须在 coordinator 首次对话**之后**跑（cron job 注册需要 wake job 存在）。
+> ⚠️ `openclaw onboard` 中配置到最后时，请选择`Hatch later`选项否则启动脚本可能会异常卡住
 
 ```bash
 # start.sh 跑完后
