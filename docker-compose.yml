@@ -4,16 +4,16 @@ services:
     container_name: butler-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:1}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-1}
       MYSQL_DATABASE: life_butler_db
     ports:
-      - "${MYSQL_PORT:3308}:3306"
+      - "${MYSQL_PORT:-3308}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mock_backend/seed.sql:/docker-entrypoint-initdb.d/01_seed.sql
       - ./skills/memory-seven-dim-skill/references/db_schema.sql:/docker-entrypoint-initdb.d/02_seven_dim.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:1}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-1}"]
       interval: 10s
       timeout: 5s
       retries: 5
