@@ -71,13 +71,18 @@ else
     --disabled \
     --no-deliver)
 
-  # --- coordinator wake（子 agent 回复唤醒） ---
+  # --- coordinator wake（子 agent 回复唤醒）---
+  # 使用 --session main 而非 custom inbox session
+  # 原因：coordinator 是面向用户的 agent，--session main 会让 cron
+  # 跑在用户聊天的那个 main session，回复直接走用户 channel（OpenClaw
+  # 文档："Main session jobs can use the target main session's last
+  # delivery context for replies"）。不再需要 shared/coordinator/inbox 转发。
   COORDINATOR_WAKE_ID=$(register_cron "butler-coordinator-wake" \
     --name "butler-coordinator-wake" \
     --agent butler \
     --at "2036-01-01T00:00:00+08:00" \
-    --session-key "session:butler-coordinator:inbox" \
-    --message "读 shared/coordinator/ 中最近2天的 .json 文件。处理子 agent 回复（行程结果、异常通知等）。组装最终回复给用户（同一 session 走 channel）。" \
+    --session main \
+    --message "读 shared/coordinator/ 中最近2天的 .json 文件。处理子 agent 回复（行程结果、异常通知等）。以本 agent 主 session 的身份直接回复用户。" \
     --disabled \
     --no-deliver)
 

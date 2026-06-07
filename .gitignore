@@ -13,7 +13,7 @@ Thumbs.db
 # 运行时数据
 mock_backend/state/
 state/
-shared/
+shared/*
 !shared/taxonomy.json
 skills/trip-skill/temp/
 agents/*/data/

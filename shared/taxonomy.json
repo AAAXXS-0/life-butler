@@ -8,7 +8,8 @@
       "role": "主入口，意图识别+路由+组装回复",
       "inbox": "shared/coordinator/",
       "wake_cron_name": "butler-coordinator-wake",
-      "session_key": "session:butler-coordinator:inbox"
+      "session_target": "main",
+      "_session_note": "coordinator 是面向用户的 agent，wake job 用 --session main（不是 custom inbox），让子 agent 回调直接走主 session 的 delivery context → 用户 channel。详见 butler-comm-skill/SKILL.md §跨 session 回调设计。"
     },
     "trip-agent": {
       "role": "行程规划、动态调整、预算边界",

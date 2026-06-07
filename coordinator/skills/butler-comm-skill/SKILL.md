@@ -410,6 +410,47 @@ openclaw cron add \
 
 ---
 
+## 跨 session 回调：coordinator wake 用 `--session main`
+
+**问题**：子 agent 跑完调 `openclaw cron run <coordinator-wake-id>` 唤醒 coordinator。如果 wake job 绑的是 custom session（如 `session:butler-coordinator:inbox`），coordinator 在 inbox session 里处理完，**不知道用户 channel 是啥**，推送成问题。
+
+**解法**（OpenClaw 文档 `docs/automation/cron-jobs.md`）：
+
+> **Main session** jobs enqueue a system event into a cron-owned run lane and optionally wake the heartbeat (`--wake now` or `--wake next-heartbeat`). They **can use the target main session's last delivery context for replies**.
+
+**coordinator wake job 用 `--session main`**：
+
+```bash
+openclaw cron add \
+  --name "butler-coordinator-wake" \
+  --agent butler \
+  --session main \
+  --message "读 shared/coordinator/ 下最近 2 天的 .json。处理子 agent 回复。**以主 session 身份直接回复用户**。"
+```
+
+效果：
+- 子 agent 回调 → coordinator 跑在主 session（用户聊天那个 session）
+- coordinator 处理完，回复自动走主 session 的 delivery context（用户 channel）
+- **不需要中间转发层**（不需要 inbox session、bridge session、Gather session 跨 session sync）
+
+**为什么其他 3 个子 agent wake job 不用 main**：
+- trip-agent / schedule-agent / account-agent **没有 user-facing session**（用户不直接跟它们聊）
+- 它们用 custom inbox session 合理（per-session 串行排队防撞锁）
+- 它们处理完写 `shared/coordinator/` → 调 `cron run <coordinator-wake-id>` 唤醒 coordinator
+
+**汇总：4 个 wake job 的 session 选择**
+
+| agent | `--session` | 原因 |
+|-------|-------------|------|
+| coordinator | `main` | 面向用户 → 回调进主 session → 走用户 channel |
+| trip-agent | `session:butler-trip-agent:inbox` | 无 user-facing session，要 per-session 串行防撞锁 |
+| schedule-agent | `session:butler-schedule-agent:inbox` | 同上 |
+| account-agent | `session:butler-account-agent:inbox` | 同上 |
+
+**陷阱**：Gather Session 跨 agent 多回复场景不适用本方案。Gather 是 coordinator 等多个 agent 全部回完才统一回复——这意味着 coordinator 是在某个 cron run 里（不是用户实时聊天），跑在 main session 也 OK，但子 agent 推结果时不要相互依赖（同 session main 能保证串行）。
+
+---
+
 ## 错误处理
 
 | 场景 | 处理 |
