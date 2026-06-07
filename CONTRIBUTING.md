@@ -8,8 +8,8 @@
 
 |贡献者 | GitHub | 主要贡献 |
 |--------|--------|---------|
-|厸 | [](https://github.com/) | 项目发起人。智能行程规划引擎、4 个 Agent 系统、Mock Backend、数据库设计、Docker 集成、所有核心功能实现 |
-| 0 | [](https://github.com/) | 系统架构设计、多 Agent 协作流程、七维记忆系统设计、代码审查与重构、文档编写 |
+|AAAXXS-0| [https://github.com/AAAXXS-0] | 项目发起人。智能行程规划引擎、4 个 Agent 系统、Mock Backend、数据库设计、Docker 集成、所有核心功能实现 |
+|FNAAAAAAAAAA| [https://github.com/FNAAAAAAAAAA] | 系统架构设计、多 Agent 协作流程、七维记忆系统设计、代码审查与重构、文档编写 |
 
 ---
 
