@@ -121,6 +121,20 @@ get_alternative_paths(origin_id, dest_id, edge_types, count)
 query_taxi_stands({ city, near, radius_km })
   → [{ id, name, lat, lng, queue_count, status, distance_m }]
 
+estimate_taxi_eta(stand_id, user_lat, user_lng)
+  → {
+      stand_id, stand_name, distance_km,
+      drive_min, wait_min, dispatch_min, total_eta_min,
+      price_yuan, queue_count, status
+    }
+
+estimate_taxi_eta(stand_id, user_lat, user_lng)
+  → {
+      stand_id, stand_name, distance_km,
+      drive_min, wait_min, dispatch_min, total_eta_min,
+      price_yuan, queue_count, status
+    }
+
 generate_event(trip_day)
   → { event } 或 null
 
@@ -173,14 +187,14 @@ get_active_events(trip_nodes)
 ## 8. 实施步骤
 
 1. MySQL 建库建表
-2. 生成北京子图 mock 数据（~52 nodes + ~80 edges）
-3. `mock_backend/index.js`（query + Dijkstra + 备选）
-4. `mock_backend/event_generator.js`（7 种事件，概率触发）
+2. 生成北京子图 mock 数据（~56 nodes + ~90 edges，含 4 个 taxi_stand + 10 条 taxi 边）
+3. `mock_backend/index.js`（query + Dijkstra + 备选 + `estimate_taxi_eta`）
+4. `mock_backend/event_generator.js`（12 种随机事件，概率触发）
 5. 接入 phase2_poi_filter.js
-6. trip-skill phase3 改图路径规划
+6. trip-skill phase3 改图路径规划（含 taxi edge）
 7. **两个定时脚本**（系统 crontab 调度）：
-   - `mock_backend/scripts/anomaly_generator.js`：每 30m 改一次 MySQL 状态
-   - `mock_backend/scripts/anomaly_detector.js`：每 10m 检测，有变化推 trip-agent
+   - `mock_backend/scripts/event_generator.js`：每 30m 改一次 MySQL 状态
+   - `mock_backend/scripts/event_detector.js`：每 10m 检测，有变化推 trip-agent
 
 详见 `ARCHITECTURE/06-Cron-定时任务.md` §mockend 脚本 + 本文档 §9。
 

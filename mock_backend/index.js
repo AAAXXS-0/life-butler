@@ -515,6 +515,72 @@ async function close() {
   }
 }
 
+// ============== 出租车 ETA 预估 ==============
+
+/**
+ * Haversine 距离计算 (km)
+ */
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/**
+ * 出租车计价（近似北京标准）
+ * 起步 13 元 (3km 内) + 后续 2.3 元/km
+ */
+function estimateTaxiPrice(distanceKm) {
+  if (distanceKm <= 3) return 13;
+  return 13 + (distanceKm - 3) * 2.3;
+}
+
+/**
+ * 预估出租车 ETA（独立叫车专用）
+ * 不走 Dijkstra，直接 haversine + 平均车速计算（打车走的是路网，不是图模型的边）
+ *
+ * @param {string} stand_id - 出租车点节点 ID（如 'taxi_001'）
+ * @param {number} user_lat - 用户纬度
+ * @param {number} user_lng - 用户经度
+ * @returns {Object|null} {
+ *   stand_id, stand_name,
+ *   distance_km, drive_min, wait_min, total_eta_min, price_yuan,
+ *   queue_count, status
+ * }
+ */
+async function estimate_taxi_eta(stand_id, user_lat, user_lng) {
+  if (!stand_id) return null;
+  const stands = await query_nodes({ type: 'taxi_stand' });
+  const stand = stands.find((s) => s.id === stand_id);
+  if (!stand) return null;
+
+  const props = typeof stand.props === 'string' ? JSON.parse(stand.props) : (stand.props || {});
+  const distanceKm = haversineKm(stand.lat, stand.lng, user_lat, user_lng);
+  // 打车平均车速 24 km/h（含红灯/堵车） → 2.5 min/km
+  const driveMin = Math.round(distanceKm * 2.5);
+  // 排队等车时间由 props.avg_wait_min 决定（不是距离的函数）
+  const waitMin = props.avg_wait_min || 3;
+  // 调度时间（平台分配司机）默认 1 min
+  const dispatchMin = 1;
+
+  return {
+    stand_id: stand.id,
+    stand_name: stand.name,
+    distance_km: Math.round(distanceKm * 100) / 100,
+    drive_min: driveMin,
+    wait_min: waitMin,
+    dispatch_min: dispatchMin,
+    total_eta_min: dispatchMin + waitMin + driveMin,
+    price_yuan: Math.round(estimateTaxiPrice(distanceKm) * 10) / 10,
+    queue_count: stand.queue_count || 0,
+    status: stand.status,
+  };
+}
+
 module.exports = {
   query_nodes,
   query_edges,
@@ -522,8 +588,11 @@ module.exports = {
   get_alternative_paths,
   get_active_events,
   get_weather,
+  estimate_taxi_eta,
   close,
   // 暴露给单测
   _withRetry: withRetry,
   _MinPriorityQueue: MinPriorityQueue,
+  _haversineKm: haversineKm,
+  _estimateTaxiPrice: estimateTaxiPrice,
 };

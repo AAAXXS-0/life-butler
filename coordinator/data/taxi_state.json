@@ -1,0 +1,13 @@
+{
+  "_comment": "出租车叫车状态机跟踪文件。Coordinator 维护。位置: coordinator/data/taxi_state.json。每条记录 = 一笔进行中或刚结束的叫车。",
+  "_state_machine": {
+    "called": "用户已叫车，等待调度",
+    "dispatched": "已派车，司机接单，正在开过来（dispatch_min）",
+    "arriving": "车距用户 < 1 min",
+    "arrived": "车已到达，等待用户上车（5 min 超时）",
+    "onboard": "用户已上车",
+    "cancelled": "用户/司机取消",
+    "completed": "行程结束（用户下车）"
+  },
+  "calls": []
+}

@@ -187,6 +187,49 @@ ALTER TABLE events MODIFY target_type ENUM('node','edge','city') NOT NULL;
 | **数据流独立** | trip 内的 taxi 路径由 phase3 算好；独立叫车由 taxi-skill 实时查 |
 | **不调真 API** | 全部走 mockend，高德/滴滴接口预留（未实现） |
 
+### ETA 计算（场景 B）
+
+**关键区分**：等车时间 ≠ 距离
+
+| 组成 | 来源 | 是否距离函数 |
+|------|------|-----------|
+| dispatch_min | 平台分配 | ❌ 常量 1 min |
+| wait_min | `taxi_stand.props.avg_wait_min` | ❌ 跟时段/地点/queue_count 有关 |
+| drive_min | `haversine(stand, user) × 2.5min/km` | ✅ 距离函数 |
+
+接口：`MockBackend.estimate_taxi_eta(stand_id, user_lat, user_lng)`
+
+计价（北京）：起步 13 元 (3km) + 2.3 元/km
+
+### 状态机 + 延迟通知（场景 B）
+
+**7 个状态**：`called` → `dispatched` → `arriving` → `arrived` → `onboard` / `cancelled` / `completed`
+
+**状态文件**：`coordinator/data/taxi_state.json`（运行时数据，可加 gitignore）
+
+**延迟通知机制**：OpenClaw `at` cron
+
+派车时动态注册 4 个 `at` cron（到点自动跑一次，跑完自动删）：
+
+```bash
+# 派车时（T+0）
+T_DISPATCH=$(( $(date +%s) + 60 ))              # +1 min
+T_ARRIVING=$(( $(date +%s) + (ETA-1)*60 ))      # ETA-1
+T_ARRIVED=$(( $(date +%s) + ETA*60 ))           # ETA
+T_TIMEOUT=$(( $(date +%s) + (ETA+5)*60 ))       # ETA+5
+
+openclaw cron add --name "taxi-${CALL_ID}-dispatch" \
+  --agent coordinator \
+  --schedule kind=at,at=$(date -d @$T_DISPATCH -Iseconds) \
+  --message "推进 callId=$CALL_ID 到 dispatched" \
+  --delete-after-run
+# ... 其他 3 个类似
+```
+
+**为什么不加到 events 表**：taxi 叫车是有状态机的工作流（called→dispatched→...），不是随机的环境变化。状态机数据有 `state` + `history`，跟 events 表的"一条 = 一次环境变更"语义不同。
+
+详见 `coordinator/skills/taxi-skill/SKILL.md`。
+
 ---
 
 ## 九、文件清单

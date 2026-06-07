@@ -209,6 +209,8 @@ shared/
 
 **过滤规则**：detector 只推 `is_good=0` 的事件到 trip-agent。trip 收到后判断是否影响路线，影响就调 replan-skill 重算。
 
+> **不在本表里**：出租车叫车的事件（派车/接近/到达）是**状态机**（`coordinator/data/taxi_state.json`），不是随机环境变更。详见 `coordinator/skills/taxi-skill/SKILL.md` §状态机。
+
 ---
 
 ## 快速开始
@@ -310,7 +312,7 @@ butler/
 │   └── schedule.json    #   日程（Schedule 主写）
 │
 ├── mock_backend/
-│   ├── index.js         # MySQL 查询模块（query_nodes / shortest_path / get_weather，taxi edge 支持）
+│   ├── index.js         # MySQL 查询模块（query_nodes / shortest_path / get_weather / estimate_taxi_eta，taxi edge 支持）
 │   ├── seed.sql         # 10 张表 DDL + 北京子图 mock 数据（56 节点 + 90 边，含 4 个 taxi_stand）
 │   └── scripts/
 │       ├── event_generator.js   # 12 事件生成（系统 cron 每 30m）
@@ -343,7 +345,8 @@ butler/
 ├── coordinator/         # LifeButler 主入口
 │   ├── AGENTS.md
 │   ├── data/
-│   │   └── init_questionnaire.json
+│   │   ├── init_questionnaire.json
+│   │   └── taxi_state.json         # 叫车状态机（called→dispatched→arriving→arrived→onboard/cancelled）
 │   ├── memory/
 │   │   ├── init-readme.md          # 首次使用问卷
 │   │   └── gather/                 # 多 Agent 回复聚合
