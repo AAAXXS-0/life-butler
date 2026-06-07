@@ -34,7 +34,7 @@ Mock Backend 是 Butler 系统的**动态数据层**，负责：
 ```sql
 CREATE TABLE nodes (
   id         VARCHAR(32) PRIMARY KEY,
-  type       ENUM('attraction','restaurant','hotel','transport_hub') NOT NULL,
+  type       ENUM('attraction','restaurant','hotel','transport_hub','taxi_stand') NOT NULL,
   name       VARCHAR(128) NOT NULL,
   lat        DOUBLE NOT NULL,
   lng        DOUBLE NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE edges (
   id             VARCHAR(32) PRIMARY KEY,
   from_node      VARCHAR(32) NOT NULL,
   to_node        VARCHAR(32) NOT NULL,
-  type           ENUM('walk','metro','drive') NOT NULL,
+  type           ENUM('walk','metro','drive','taxi') NOT NULL,
   distance_m     INT NOT NULL,
   duration_min   INT NOT NULL,
   metro_line     VARCHAR(32),
@@ -118,6 +118,9 @@ get_shortest_path(origin_id, dest_id, edge_types)
 get_alternative_paths(origin_id, dest_id, edge_types, count)
   → [{ path, edges, total_distance_m, total_duration_min }]
 
+query_taxi_stands({ city, near, radius_km })
+  → [{ id, name, lat, lng, queue_count, status, distance_m }]
+
 generate_event(trip_day)
   → { event } 或 null
 
@@ -138,6 +141,7 @@ get_active_events(trip_nodes)
 | 5 | 酒店满房 | hotel → status='full' |
 | 6 | 航班/高铁延误 | transport_hub 写入 events |
 | 7 | 景点活动取消 | attraction props 更新 |
+| 8 | 打车点车多/车少 | taxi_stand → queue_count ±N |
 
 ---
 

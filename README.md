@@ -13,10 +13,10 @@
 
 | 模块 | 说明 |
 |------|------|
-| **图模型行程规划** | 自实现 Dijkstra + K-Means，POI/路径/备选全部走图查询 |
+| **图模型行程规划** | 自实现 Dijkstra + K-Means，POI/路径/备选全部走图查询，taxi 作为 edge 选项 |
 | **双层记忆** | 五层文件版（时间衰减）+ 七维 MySQL（内容画像），两套完全独立 |
 | **事件模拟** | 12 种事件自动生成（天气/排队/路况/景区），好事过滤，坏事触发自动 replan |
-| **本地生活 4 skill** | weather/queue/traffic/nearby — trip 回调后拼提示文案，nearby 走独立路径 |
+| **本地生活 5 skill** | weather/queue/traffic/nearby/taxi — trip 回调后拼提示文案，nearby/taxi 走独立路径 |
 | **异步 A2A** | `shared/<agent>/YYYY-MM-DD.json` + `openclaw cron run` 链式触发，不用 sessions_send |
 
 ---
@@ -44,13 +44,13 @@
 
 ---
 
-## 13 个 Skill
+## 14 个 Skill
 
 ### 各 Agent 专属
 
 | Skill | 位置 | Agent | 用途 |
 |-------|------|-------|------|
-| `trip-skill` | `agents/trip-agent/skills/trip-skill/` | Trip | 4 阶段行程规划 |
+| `trip-skill` | `agents/trip-agent/skills/trip-skill/` | Trip | 4 阶段行程规划，含 taxi edge |
 | `replan-skill` | `agents/trip-agent/skills/replan-skill/` | Trip | 坏事件后内部使用，调 monitor |
 | `butler-comm-skill` | `coordinator/skills/butler-comm-skill/` | Coordinator | A2A 通信封装 |
 | `subagent-skill` | `coordinator/skills/subagent-skill/` | Coordinator | `sessions_spawn` 委托规范 |
@@ -58,6 +58,7 @@
 | `queue-monitor-skill` | `coordinator/skills/queue-monitor-skill/` | Coordinator | 排队坏事件文案 |
 | `traffic-monitor-skill` | `coordinator/skills/traffic-monitor-skill/` | Coordinator | 交通坏事件文案 |
 | `nearby-search-skill` | `coordinator/skills/nearby-search-skill/` | Coordinator | 用户问"附近"独立路径 |
+| `taxi-skill` | `coordinator/skills/taxi-skill/` | Coordinator | 用户独立叫车（不在 trip 框架内）|
 
 ### 共享（注册到全部 4 agent）
 
@@ -74,8 +75,8 @@
 
 | 分组 | 表 | 说明 |
 |------|-----|------|
-| **图模型** | `nodes` | POI 节点（attraction/restaurant/hotel/transport_hub，含 queue_count/is_indoor）|
-| | `edges` | 边（walk/metro/drive，带 distance_m/duration_min）|
+| **图模型** | `nodes` | POI 节点（attraction/restaurant/hotel/transport_hub/taxi_stand，含 queue_count/is_indoor）|
+| | `edges` | 边（walk/metro/drive/taxi，带 distance_m/duration_min）|
 | | `node_status` | 节点动态状态（open/full/closed/limited）|
 | | `edge_status` | 边动态状态（open/congested/closed）|
 | | `events` | 事件记录（12 类型 + is_good 标记）|
@@ -309,8 +310,8 @@ butler/
 │   └── schedule.json    #   日程（Schedule 主写）
 │
 ├── mock_backend/
-│   ├── index.js         # MySQL 查询模块（query_nodes / shortest_path / get_weather）
-│   ├── seed.sql         # 10 张表 DDL + 北京子图 mock 数据
+│   ├── index.js         # MySQL 查询模块（query_nodes / shortest_path / get_weather，taxi edge 支持）
+│   ├── seed.sql         # 10 张表 DDL + 北京子图 mock 数据（56 节点 + 90 边，含 4 个 taxi_stand）
 │   └── scripts/
 │       ├── event_generator.js   # 12 事件生成（系统 cron 每 30m）
 │       └── event_detector.js    # 过滤 is_good=0 推 trip（系统 cron 每 10m）
@@ -349,13 +350,14 @@ butler/
 │   ├── scripts/
 │   │   ├── init.sh                 # cron job 注册
 │   │   └── user-init-questionnaire.html
-│   └── skills/         # coordinator 专属（8 个）
+│   └── skills/         # coordinator 专属（9 个）
 │       ├── butler-comm-skill/      #   A2A 通信
 │       ├── subagent-skill/         #   sessions_spawn 委托
 │       ├── weather-monitor-skill/  #   本地生活：天气
 │       ├── queue-monitor-skill/    #   本地生活：排队
 │       ├── traffic-monitor-skill/  #   本地生活：交通
-│       └── nearby-search-skill/    #   本地生活：附近
+│       ├── nearby-search-skill/    #   本地生活：附近
+│       └── taxi-skill/             #   本地生活：打车（独立叫车）
 │
 ├── docs/
 │   ├── butleragent-v2.drawio.svg   # 架构图（draw.io 导出）

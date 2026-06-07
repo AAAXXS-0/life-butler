@@ -20,6 +20,7 @@
 | queue-monitor-skill | Coordinator | trip replan 回调（queue_increase=true） | `coordinator/skills/queue-monitor-skill/SKILL.md` |
 | traffic-monitor-skill | Coordinator | trip replan 回调（traffic_congestion=true） | `coordinator/skills/traffic-monitor-skill/SKILL.md` |
 | nearby-search-skill | Coordinator | 用户主动问"附近有啥" | `coordinator/skills/nearby-search-skill/SKILL.md` |
+| taxi-skill | Coordinator | 用户主动叫车（不在 trip 框架内） | `coordinator/skills/taxi-skill/SKILL.md` |
 | replan-skill | trip-agent | mockend 坏事件触发后内部使用 | `agents/trip-agent/skills/replan-skill/SKILL.md` |
 
 ---
@@ -159,6 +160,35 @@ ALTER TABLE events MODIFY target_type ENUM('node','edge','city') NOT NULL;
 
 ---
 
+## 八点五、打车双场景设计（trip 内 + 独立叫车）
+
+打车功能分为**两个独立场景**实现，避免一个 skill 同时管 trip 规划和独立叫车两种需求。
+
+### 场景 A：trip 内的 taxi 接驳
+
+- **执行者**：Trip Agent（`trip-skill` 阶段三）
+- **实现方式**：`edges.type` 加 `'taxi'` 选项，taxi_stand 节点提供打车点
+- **使用场景**：景点 → 酒店、深夜/坏天气下不坐地铁、跨区接驳
+- **不调 skill**：trip-skill 阶段三的 Dijkstra 直接把 taxi edge 纳入候选池
+
+### 场景 B：独立的叫车请求
+
+- **执行者**：Coordinator（`taxi-skill`）
+- **实现方式**：`coordinator/skills/taxi-skill/`，独立 skill
+- **使用场景**：用户说"下班了帮我叫车回家"、"打个车去机场"（不在 trip 框架内）
+- **数据源**：`trips.json.current_location`（不问位置）→ `MockBackend.query_nodes({ type: 'taxi_stand', near, radius_km: 2 })`
+
+### 关键设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **不重复造轮子** | trip 内和独立叫车**共享** taxi_stand 节点 + taxi 边数据 |
+| **不混用 skill** | trip 内接驳不调 `taxi-skill`，独立叫车不走 `trip-skill` |
+| **数据流独立** | trip 内的 taxi 路径由 phase3 算好；独立叫车由 taxi-skill 实时查 |
+| **不调真 API** | 全部走 mockend，高德/滴滴接口预留（未实现） |
+
+---
+
 ## 九、文件清单
 
 ```
@@ -177,13 +207,14 @@ agents/
 │       ├── weather-monitor-skill/  # 本地生活：天气
 │       ├── queue-monitor-skill/    # 本地生活：排队
 │       ├── traffic-monitor-skill/  # 本地生活：交通
-│       └── nearby-search-skill/    # 本地生活：附近
+│       ├── nearby-search-skill/    # 本地生活：附近
+│       └── taxi-skill/             # 本地生活：打车（独立叫车）
 skills/                            # 共享 skill
 ├── memory-layers-skill/
 └── memory-seven-dim-skill/
 mock_backend/
-├── index.js                            (+ get_weather, + queue_count/is_indoor)
-├── seed.sql                            (+ weather 表, + is_indoor/queue_count, + events.is_good)
+├── index.js                            (+ get_weather, + queue_count/is_indoor, + taxi edge 支持)
+├── seed.sql                            (+ weather 表, + is_indoor/queue_count, + events.is_good, + taxi_stand 节点 + taxi 边)
 └── scripts/
     ├── event_generator.js              (替代 anomaly_generator.js)
     └── event_detector.js               (替代 anomaly_detector.js)
