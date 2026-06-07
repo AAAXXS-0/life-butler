@@ -143,6 +143,8 @@ node skills/trip-skill/phases/phase3_spatial_optimizer.js <phase2_json> <days> <
 2. 组内用 `MockBackend.get_shortest_path()` 做 Dijkstra 路径规划
 3. 每个 POI 对之间调用 `get_alternative_paths()` 生成备选路线
 4. 插入用餐时段（午餐 12:00-13:00，晚餐 18:00-20:00）
+
+**边类型支持**：`['walk', 'metro', 'drive', 'taxi']`——`taxi` 走 taxi_stand 节点的 10 条专边，主要用于跨区接驳、深夜/坏天气下不坐地铁的场景。阶段三输出中 `path_to_next.type` 会取主走边类型。
 5. **处理 budget_context**（详见「预算处理」章节）：
    - `constraint` 模式：方案总价严格 ≤ `month_remaining`，超支项自动替换为低价选项
    - `reference` 模式：方案可超出 `month_remaining`，warnings 注入超支提示，不硬阻断品质

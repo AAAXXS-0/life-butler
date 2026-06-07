@@ -13,7 +13,7 @@ USE life_butler_db;
 -- =============================================
 CREATE TABLE IF NOT EXISTS nodes (
   id         VARCHAR(32) PRIMARY KEY,
-  type       ENUM('attraction','restaurant','hotel','transport_hub') NOT NULL,
+  type       ENUM('attraction','restaurant','hotel','transport_hub','taxi_stand') NOT NULL,
   name       VARCHAR(128) NOT NULL,
   lat        DOUBLE NOT NULL,
   lng        DOUBLE NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS edges (
   id             VARCHAR(32) PRIMARY KEY,
   from_node      VARCHAR(32) NOT NULL,
   to_node        VARCHAR(32) NOT NULL,
-  type           ENUM('walk','metro','drive') NOT NULL,
+  type           ENUM('walk','metro','drive','taxi') NOT NULL,
   distance_m     INT NOT NULL,
   duration_min   INT NOT NULL,
   metro_line     VARCHAR(32),
@@ -166,6 +166,14 @@ INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALU
 ('hub_003','transport_hub','北京站',39.9023,116.4270, JSON_OBJECT('city','北京','lines',JSON_ARRAY('高铁','地铁2号线')), 0, 1),
 ('hub_004','transport_hub','首都机场',40.0801,116.5846, JSON_OBJECT('city','北京','lines',JSON_ARRAY('机场快线','飞机')), 0, 1);
 
+-- 出租车上下客点（4 个，与核心商区/景点布局）
+-- queue_count 表示当前可调度车数（event_generator 会动态调）
+INSERT INTO nodes (id, type, name, lat, lng, props, queue_count, is_indoor) VALUES
+('taxi_001','taxi_stand','国贸打车点',39.9085,116.4507, JSON_OBJECT('city','北京','district','CBD','queue_capacity',12,'avg_wait_min',3,'pricing_note','首汽约车多'), 8, 0),
+('taxi_002','taxi_stand','三里屯打车点',39.9362,116.4547, JSON_OBJECT('city','北京','district','三里屯','queue_capacity',10,'avg_wait_min',2,'pricing_note','夜间车多'), 6, 0),
+('taxi_003','taxi_stand','王府井打车点',39.9135,116.4106, JSON_OBJECT('city','北京','district','王府井','queue_capacity',8,'avg_wait_min',4,'pricing_note','白天车多'), 5, 0),
+('taxi_004','taxi_stand','西单打车点',39.9075,116.3722, JSON_OBJECT('city','北京','district','西城','queue_capacity',8,'avg_wait_min',3,'pricing_note','商圈稳定'), 6, 0);
+
 -- 节点初始状态（全部 open）
 INSERT INTO node_status (node_id, status) VALUES
 ('attr_001','open'),('attr_002','open'),('attr_003','open'),('attr_004','open'),('attr_005','open'),
@@ -178,7 +186,8 @@ INSERT INTO node_status (node_id, status) VALUES
 ('rest_011','open'),('rest_012','open'),('rest_013','open'),('rest_014','open'),('rest_015','open'),
 ('hotel_001','open'),('hotel_002','open'),('hotel_003','open'),('hotel_004','open'),
 ('hotel_005','open'),('hotel_006','open'),('hotel_007','open'),('hotel_008','open'),
-('hub_001','open'),('hub_002','open'),('hub_003','open'),('hub_004','open');
+('hub_001','open'),('hub_002','open'),('hub_003','open'),('hub_004','open'),
+('taxi_001','open'),('taxi_002','open'),('taxi_003','open'),('taxi_004','open');
 
 -- =============================================
 -- 边（walk + metro + drive，~80 条）
@@ -273,6 +282,21 @@ INSERT INTO edges (id, from_node, to_node, type, distance_m, duration_min) VALUE
 ('edge_d024','attr_018','hub_001', 'drive', 18000, 35),
 ('edge_d025','attr_018','hub_004', 'drive', 35000, 55);
 
+-- 出租车/打车边（10 条，含 taxi_stand 互连 + 跨区接驳）
+-- 打车收费：起步 13 元（3km） + 后续 2.3 元/km（近似）
+-- 与 drive 不同：打车可门到门、可在无 drive 边的位置设 taxi_stand
+INSERT INTO edges (id, from_node, to_node, type, distance_m, duration_min) VALUES
+('edge_t001','taxi_001','taxi_002', 'taxi', 4500, 12),
+('edge_t002','taxi_001','taxi_003', 'taxi', 5500, 15),
+('edge_t003','taxi_002','taxi_003', 'taxi', 7500, 20),
+('edge_t004','taxi_003','taxi_004', 'taxi', 4500, 12),
+('edge_t005','taxi_001','attr_015', 'taxi', 3500, 10),   -- 国贸 → 三里屯
+('edge_t006','taxi_002','attr_015', 'taxi', 800, 4),     -- 三里屯打车点 → 三里屯
+('edge_t007','taxi_003','attr_014', 'taxi', 600, 3),     -- 王府井打车点 → 王府井
+('edge_t008','taxi_004','attr_001', 'taxi', 5000, 14),   -- 西单 → 故宫
+('edge_t009','taxi_001','attr_009', 'taxi', 4000, 11),   -- 国贸 → 798
+('edge_t010','taxi_002','attr_017', 'taxi', 3000, 9);    -- 三里屯 → 朝阳公园
+
 -- 边初始状态（全部 open）
 INSERT INTO edge_status (edge_id, status) VALUES
 ('edge_w001','open'),('edge_w002','open'),('edge_w003','open'),('edge_w004','open'),('edge_w005','open'),
@@ -290,13 +314,16 @@ INSERT INTO edge_status (edge_id, status) VALUES
 ('edge_d006','open'),('edge_d007','open'),('edge_d008','open'),('edge_d009','open'),('edge_d010','open'),
 ('edge_d011','open'),('edge_d012','open'),('edge_d013','open'),('edge_d014','open'),('edge_d015','open'),
 ('edge_d016','open'),('edge_d017','open'),('edge_d018','open'),('edge_d019','open'),('edge_d020','open'),
-('edge_d021','open'),('edge_d022','open'),('edge_d023','open'),('edge_d024','open'),('edge_d025','open');
+('edge_d021','open'),('edge_d022','open'),('edge_d023','open'),('edge_d024','open'),('edge_d025','open'),
+('edge_t001','open'),('edge_t002','open'),('edge_t003','open'),('edge_t004','open'),
+('edge_t005','open'),('edge_t006','open'),('edge_t007','open'),('edge_t008','open'),
+('edge_t009','open'),('edge_t010','open');
 
 -- =============================================
 -- 数据统计
 -- =============================================
--- nodes:       25 attraction + 15 restaurant + 8 hotel + 4 transport_hub = 52
--- edges:       25 walk + 30 metro + 25 drive = 80
--- node_status: 52
--- edge_status: 80
+-- nodes:       25 attraction + 15 restaurant + 8 hotel + 4 transport_hub + 4 taxi_stand = 56
+-- edges:       25 walk + 30 metro + 25 drive + 10 taxi = 90
+-- node_status: 56
+-- edge_status: 90
 -- events:      0（运行时由 event_generator.js 填充）

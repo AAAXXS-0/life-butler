@@ -226,10 +226,10 @@ async function fetchStatusSets() {
  * 最短路径 (Dijkstra, 忽略 closed 节点/边)
  * @param {string} origin_id
  * @param {string} dest_id
- * @param {Array<string>} edge_types - ['walk','metro','drive']
+ * @param {Array<string>} edge_types - ['walk','metro','drive','taxi']
  * @returns {Object|null} { path, edges, total_distance_m, total_duration_min }
  */
-async function get_shortest_path(origin_id, dest_id, edge_types = ['walk', 'metro', 'drive']) {
+async function get_shortest_path(origin_id, dest_id, edge_types = ['walk', 'metro', 'drive', 'taxi']) {
   if (!origin_id || !dest_id) return null;
   if (origin_id === dest_id) {
     return { path: [origin_id], edges: [], total_distance_m: 0, total_duration_min: 0 };

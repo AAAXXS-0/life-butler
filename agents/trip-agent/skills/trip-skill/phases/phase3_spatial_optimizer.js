@@ -178,14 +178,15 @@ async function run(phase2Input, days, dailyHours, budgetContext) {
       if (i < ordered.length - 1) {
         const nextNode = ordered[i + 1];
         try {
-          const path = await MockBackend.get_shortest_path(node.id, nextNode.id, ['walk', 'metro', 'drive']);
+          const path = await MockBackend.get_shortest_path(node.id, nextNode.id, ['walk', 'metro', 'drive', 'taxi']);
           if (path) {
             // 边类型汇总
             const edgeTypes = {};
             for (const eid of path.edges) {
-              // 简单按 name 判断: edge_w = walk, edge_m = metro, edge_d = drive
+              // 简单按 name 判断: edge_w = walk, edge_m = metro, edge_d = drive, edge_t = taxi
               if (eid.includes('_w') || eid.startsWith('w')) edgeTypes.walk = (edgeTypes.walk || 0) + 1;
               else if (eid.includes('_m') || eid.startsWith('m')) edgeTypes.metro = (edgeTypes.metro || 0) + 1;
+              else if (eid.includes('_t') || eid.startsWith('t')) edgeTypes.taxi = (edgeTypes.taxi || 0) + 1;
               else edgeTypes.drive = (edgeTypes.drive || 0) + 1;
               allEdgeUsage.add(eid);
             }
@@ -261,7 +262,7 @@ async function run(phase2Input, days, dailyHours, budgetContext) {
     if (pois.length >= 2) {
       try {
         const altPath = await MockBackend.get_alternative_paths(
-          pois[0].id, pois[pois.length - 1].id, ['walk', 'metro', 'drive'], 1
+          pois[0].id, pois[pois.length - 1].id, ['walk', 'metro', 'drive', 'taxi'], 1
         );
         if (altPath && altPath[1]) {
           const alt = altPath[1];
